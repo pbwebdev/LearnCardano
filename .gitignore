@@ -1,0 +1,23 @@
+# Credentials & tokens
+.env
+.env.*
+*.token.json
+*token*.json
+*tokens*.json
+*secret*.json
+*auth.json
+youtube-auth.json
+
+# Upload state/receipts
+*.xupload.json
+*.xupload.job.json
+
+# Binaries & archives
+*.zip
+*.mp4
+*.mp3
+*.wav
+*.m4a
+
+# Node
+node_modules/

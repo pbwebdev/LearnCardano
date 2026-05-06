@@ -1,0 +1,2081 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Social Scheduler — OpenClaw</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:           #0f0f0f;
+  --surface:      #171717;
+  --surface-2:    #1f1f1f;
+  --surface-3:    #2a2a2a;
+  --border:       #2e2e2e;
+  --border-bright:#444;
+  --text:         #e8e8e8;
+  --text-muted:   #b0b0b0;
+  --text-dim:     #787878;
+  --mono:         'IBM Plex Mono', monospace;
+  --sans:         'IBM Plex Sans', sans-serif;
+  --accent:       #e8ff5a;
+  --scheduled:    #d4a843;
+  --scheduled-bg: #1e1700;
+  --posted:       #4caf82;
+  --posted-bg:    #001a10;
+  --failed:       #e05555;
+  --failed-bg:    #1a0000;
+  --partial:      #e07c30;
+  --partial-bg:   #1a0d00;
+  --posting:      #5b9cf6;
+  --posting-bg:   #00112a;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 16px;
+  min-height: 100vh;
+  line-height: 1.5;
+}
+
+/* ── Layout ── */
+.app { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+
+/* ── Sidebar ── */
+.sidebar {
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-header {
+  padding: 20px 18px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sidebar-logo {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.sidebar-title {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.sidebar-nav { padding: 12px 0; flex: 1; }
+
+.nav-section {
+  padding: 8px 18px 4px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 18px;
+  cursor: pointer;
+  border-left: 2px solid transparent;
+  transition: all 0.1s;
+  font-size: 13px;
+  color: var(--text-muted);
+  user-select: none;
+}
+
+.nav-item:hover { background: var(--surface-2); color: var(--text); }
+
+.nav-item.active {
+  border-left-color: var(--accent);
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.nav-item .label { flex: 1; }
+
+.badge {
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--surface-3);
+  color: var(--text-muted);
+}
+
+.badge-failed { background: var(--failed-bg); color: var(--failed); }
+.badge-accent { background: #1e2100; color: var(--accent); }
+
+.sidebar-footer {
+  padding: 14px 18px;
+  border-top: 1px solid var(--border);
+}
+
+.server-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.status-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  flex-shrink: 0;
+  transition: background 0.3s;
+}
+
+.status-dot.online  { background: var(--posted); }
+.status-dot.offline { background: var(--failed); }
+
+/* ── Main ── */
+.main { display: flex; flex-direction: column; min-height: 100vh; }
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 28px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.topbar-title {
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.topbar-actions { display: flex; gap: 10px; align-items: center; }
+
+.topbar-refresh {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  padding: 6px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  transition: all 0.1s;
+}
+.topbar-refresh:hover { border-color: var(--border-bright); color: var(--text); }
+
+.btn-primary {
+  background: var(--accent);
+  color: #0f0f0f;
+  border: none;
+  padding: 7px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 500;
+  transition: opacity 0.1s;
+}
+.btn-primary:hover { opacity: 0.88; }
+.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.view-content { padding: 24px 28px; flex: 1; }
+
+/* ── Offline banner ── */
+.offline-banner {
+  background: var(--failed-bg);
+  border: 1px solid var(--failed);
+  color: var(--failed);
+  padding: 10px 16px;
+  border-radius: 6px;
+  margin-bottom: 20px;
+  font-size: 13px;
+  display: none;
+}
+
+/* ── Empty state ── */
+.empty-state {
+  text-align: center;
+  padding: 80px 20px;
+  color: var(--text-dim);
+}
+.empty-state h3 { font-size: 15px; font-weight: 400; margin-bottom: 6px; color: var(--text-muted); }
+.empty-state p  { font-size: 13px; }
+
+/* ── Post card ── */
+.post-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 16px 18px 16px 22px;
+  margin-bottom: 10px;
+  transition: border-color 0.1s, opacity 0.1s;
+  position: relative;
+  overflow: hidden;
+}
+.post-card:hover { border-color: var(--border-bright); }
+.post-card[draggable=true] { cursor: grab; }
+.post-card[draggable=true]:active { cursor: grabbing; }
+.post-card.dragging { opacity: 0.4; }
+
+.slot-bar {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 4px;
+}
+
+.slot-empty {
+  background: transparent;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  padding: 10px 14px 10px 18px;
+  margin-bottom: 10px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  letter-spacing: 0.04em;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.1s, background 0.1s, color 0.1s;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.slot-empty .slot-bar { opacity: 0.5; }
+.slot-empty.drag-over {
+  border-color: var(--accent);
+  background: #1e2100;
+  color: var(--accent);
+}
+.slot-empty.drag-over .slot-bar { opacity: 1; }
+.slot-empty-time { color: var(--text-muted); }
+
+.card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.card-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  flex: 1;
+}
+
+.card-networks { display: flex; gap: 4px; flex-wrap: wrap; }
+
+.net-pill {
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  padding: 2px 7px;
+  border-radius: 3px;
+  text-transform: uppercase;
+}
+
+.net-x        { background: #1a1a1a; color: #e8e8e8; border: 1px solid #333; }
+.net-linkedin { background: #00335e; color: #60b4f0; }
+.net-bluesky  { background: #00244a; color: #60b4f0; }
+.net-discord  { background: #1e1f52; color: #b8bbff; }
+.net-facebook { background: #001740; color: #60b4f0; }
+.net-mastodon { background: #1e1052; color: #b0a8ff; }
+.net-telegram { background: #003040; color: #5dd6f8; }
+
+.card-time {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.card-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
+.btn-sm {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  transition: all 0.1s;
+}
+.btn-sm:hover { border-color: var(--border-bright); color: var(--text); }
+.btn-sm.danger:hover { border-color: var(--failed); color: var(--failed); }
+.btn-sm.success:hover { border-color: var(--posted); color: var(--posted); }
+
+.card-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.card-preview {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.card-status-row {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.network-result {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.result-ok    { color: var(--posted); }
+.result-fail  { color: var(--failed); }
+.result-skip  { color: var(--text-dim); }
+
+.status-pill {
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 3px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  display: inline-block;
+}
+
+.status-scheduled { background: var(--scheduled-bg); color: var(--scheduled); }
+.status-posting   { background: var(--posting-bg);   color: var(--posting); }
+.status-posted    { background: var(--posted-bg);    color: var(--posted); }
+.status-failed    { background: var(--failed-bg);    color: var(--failed); }
+.status-partial   { background: var(--partial-bg);   color: var(--partial); }
+
+/* ── Section heading ── */
+.section-heading {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 12px;
+  margin-top: 24px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+.section-heading:first-child { margin-top: 0; }
+
+/* ── Archive table ── */
+.archive-table { width: 100%; border-collapse: collapse; }
+.archive-table th {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  text-align: left;
+  padding: 0 12px 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.archive-table td {
+  padding: 10px 12px 10px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  vertical-align: top;
+}
+.archive-table tr:last-child td { border-bottom: none; }
+.archive-table tr:hover td { background: var(--surface-2); }
+
+/* ── Settings ── */
+.settings-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 20px;
+  margin-bottom: 20px;
+  max-width: 560px;
+}
+
+.settings-title {
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+.settings-desc { font-size: 12px; color: var(--text-muted); margin-bottom: 16px; }
+
+.time-window-row {
+  display: grid;
+  grid-template-columns: 100px 1fr 1fr 40px;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.time-window-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.field-input {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 12px;
+  width: 100%;
+  outline: none;
+  transition: border-color 0.1s;
+}
+.field-input:focus { border-color: var(--accent); }
+
+.btn-remove {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.1s;
+}
+.btn-remove:hover { border-color: var(--failed); color: var(--failed); }
+
+.btn-secondary {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  padding: 7px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: var(--sans);
+  font-size: 13px;
+  transition: all 0.1s;
+  margin-top: 8px;
+}
+.btn-secondary:hover { border-color: var(--border-bright); color: var(--text); }
+
+/* ── Modal ── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.72);
+  z-index: 100;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 40px 20px;
+  overflow-y: auto;
+}
+
+.modal-overlay.hidden { display: none; }
+
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  width: 100%;
+  max-width: 680px;
+  overflow: hidden;
+  position: relative;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-title { font-size: 15px; font-weight: 500; }
+
+.modal-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+  padding: 2px 4px;
+  transition: color 0.1s;
+}
+.modal-close:hover { color: var(--text); }
+
+.modal-body { padding: 22px; }
+
+.modal-footer {
+  padding: 16px 22px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.modal-sm { max-width: 420px; }
+
+/* ── Form elements ── */
+.form-row { margin-bottom: 18px; }
+
+.form-label {
+  display: block;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.form-input {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-family: var(--sans);
+  font-size: 13px;
+  width: 100%;
+  outline: none;
+  transition: border-color 0.1s;
+}
+.form-input:focus { border-color: var(--accent); }
+
+textarea.form-input { resize: vertical; font-family: var(--mono); font-size: 12px; line-height: 1.5; min-height: 140px; }
+
+.form-hint { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+
+.char-count { font-family: var(--mono); font-size: 10px; color: var(--text-dim); float: right; }
+.char-count.over { color: var(--failed); }
+
+/* ── Network checkboxes ── */
+.network-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.net-checkbox {
+  display: none;
+}
+
+.net-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-muted);
+  transition: all 0.1s;
+  user-select: none;
+}
+
+.net-label:hover { border-color: var(--border-bright); color: var(--text); }
+
+.net-checkbox:checked + .net-label {
+  border-color: var(--accent);
+  color: var(--text);
+  background: #1e2100;
+}
+
+.net-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.dot-x        { background: #888; }
+.dot-linkedin { background: #0077b5; }
+.dot-bluesky  { background: #0085ff; }
+.dot-discord  { background: #5865f2; }
+.dot-facebook { background: #1877f2; }
+.dot-mastodon { background: #6364ff; }
+.dot-telegram { background: #2aabee; }
+
+/* ── Content tabs (per-network) ── */
+.content-tabs { margin-top: 16px; }
+
+.tab-bar {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0;
+  overflow-x: auto;
+}
+
+.tab-btn {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  padding: 8px 14px;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  transition: all 0.1s;
+  white-space: nowrap;
+  margin-bottom: -1px;
+}
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active { border-bottom-color: var(--accent); color: var(--text); }
+
+.tab-panel {
+  display: none;
+  padding: 16px 0 0;
+}
+.tab-panel.active { display: block; }
+
+/* ── JSON import area ── */
+.json-import-area {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.json-import-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.json-import-row textarea {
+  flex: 1;
+  min-height: 80px;
+}
+
+.btn-parse {
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  padding: 8px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  transition: all 0.1s;
+}
+.btn-parse:hover { border-color: var(--accent); color: var(--accent); }
+
+.parse-error {
+  font-size: 11px;
+  color: var(--failed);
+  margin-top: 6px;
+  display: none;
+}
+
+/* ── X thread builder ── */
+.tweet-list { display: flex; flex-direction: column; gap: 8px; }
+
+.tweet-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.tweet-num {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-dim);
+  padding-top: 10px;
+  width: 16px;
+  flex-shrink: 0;
+}
+
+.tweet-row textarea { flex: 1; min-height: 64px; }
+
+.btn-remove-tweet {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  padding: 6px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.1s;
+  margin-top: 4px;
+}
+.btn-remove-tweet:hover { border-color: var(--failed); color: var(--failed); }
+
+.btn-add-tweet {
+  background: none;
+  border: 1px dashed var(--border);
+  color: var(--text-dim);
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 11px;
+  margin-top: 6px;
+  transition: all 0.1s;
+}
+.btn-add-tweet:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── Schedule picker ── */
+.schedule-options { display: flex; flex-direction: column; gap: 10px; }
+
+.schedule-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: border-color 0.1s;
+}
+.schedule-option:hover { border-color: var(--border-bright); }
+.schedule-option.selected { border-color: var(--accent); background: #1e2100; }
+
+.schedule-option input[type=radio] { margin-top: 2px; accent-color: var(--accent); }
+
+.schedule-option-label { font-size: 13px; font-weight: 500; margin-bottom: 2px; }
+.schedule-option-desc  { font-size: 12px; color: var(--text-muted); }
+
+.manual-slot-picker {
+  display: none;
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.manual-slot-picker.hidden { display: none; }
+
+/* ── Media row ── */
+.media-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+/* ── Confirm dialog ── */
+.confirm-message {
+  padding: 16px 22px;
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-bright); }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">OpenClaw</div>
+      <div class="sidebar-title">Social Scheduler</div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section">Queue</div>
+      <div class="nav-item active" data-view="upcoming">
+        <span class="label">Upcoming</span>
+        <span class="badge" id="badge-upcoming">0</span>
+      </div>
+      <div class="nav-item" data-view="failed">
+        <span class="label">Failed / Partial</span>
+        <span class="badge" id="badge-failed">0</span>
+      </div>
+
+      <div class="nav-section">History</div>
+      <div class="nav-item" data-view="archive">
+        <span class="label">Archive</span>
+        <span class="badge" id="badge-archive">0</span>
+      </div>
+
+      <div class="nav-section">Config</div>
+      <div class="nav-item" data-view="settings">
+        <span class="label">Settings</span>
+      </div>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="server-status">
+        <div class="status-dot" id="status-dot"></div>
+        <span id="status-text">Connecting…</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── Main ── -->
+  <main class="main">
+    <div class="topbar">
+      <div class="topbar-title" id="view-title">Upcoming</div>
+      <div class="topbar-actions">
+        <span id="refresh-countdown" style="font-family:var(--mono);font-size:11px;color:var(--text-dim);letter-spacing:0.05em">refresh in 30s</span>
+        <button class="topbar-refresh" id="btn-refresh">↻ Refresh</button>
+        <button class="btn-primary" id="btn-add-post">+ Add Post</button>
+      </div>
+    </div>
+
+    <div class="view-content">
+      <div class="offline-banner" id="offline-banner">
+        Cannot reach the scheduler server at <strong>localhost:3111</strong>.
+        Start it with: <code>cd scripts/scheduler &amp;&amp; node server.js</code>
+      </div>
+      <div id="view-content"></div>
+    </div>
+  </main>
+</div>
+
+<!-- ── Add / Edit Post Modal ── -->
+<div class="modal-overlay hidden" id="modal-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-title">Add Post</div>
+      <button class="modal-close" id="modal-close">×</button>
+    </div>
+    <div class="modal-body">
+
+      <!-- JSON import -->
+      <div class="form-row">
+        <label class="form-label">Import from AI template JSON (optional)</label>
+        <div class="json-import-area">
+          <div class="json-import-row">
+            <textarea class="form-input" id="json-import" placeholder='Paste filled post-template.json here and click Parse…' rows="4"></textarea>
+            <button class="btn-parse" id="btn-parse">Parse</button>
+          </div>
+          <div class="parse-error" id="parse-error"></div>
+        </div>
+      </div>
+
+      <!-- Title -->
+      <div class="form-row">
+        <label class="form-label">Title</label>
+        <input type="text" class="form-input" id="field-title" placeholder="Short label shown in the dashboard">
+      </div>
+
+      <!-- Networks -->
+      <div class="form-row">
+        <label class="form-label">Networks</label>
+        <div class="network-grid">
+          <input type="checkbox" class="net-checkbox" id="net-x" value="x">
+          <label class="net-label" for="net-x">
+            <span class="net-dot dot-x"></span> X
+          </label>
+
+          <input type="checkbox" class="net-checkbox" id="net-linkedin" value="linkedin">
+          <label class="net-label" for="net-linkedin">
+            <span class="net-dot dot-linkedin"></span> LinkedIn
+          </label>
+
+          <input type="checkbox" class="net-checkbox" id="net-bluesky" value="bluesky">
+          <label class="net-label" for="net-bluesky">
+            <span class="net-dot dot-bluesky"></span> Bluesky
+          </label>
+
+          <input type="checkbox" class="net-checkbox" id="net-discord" value="discord">
+          <label class="net-label" for="net-discord">
+            <span class="net-dot dot-discord"></span> Discord
+          </label>
+
+          <input type="checkbox" class="net-checkbox" id="net-facebook" value="facebook">
+          <label class="net-label" for="net-facebook">
+            <span class="net-dot dot-facebook"></span> Facebook
+          </label>
+
+          <input type="checkbox" class="net-checkbox" id="net-telegram" value="telegram">
+          <label class="net-label" for="net-telegram">
+            <span class="net-dot dot-telegram"></span> Telegram
+          </label>
+        </div>
+      </div>
+
+      <!-- Media -->
+      <div class="form-row">
+        <label class="form-label">Media (absolute paths on the Linux machine)</label>
+        <div class="media-row">
+          <div>
+            <input type="text" class="form-input" id="field-image" placeholder="Image path (.jpg/.png)">
+          </div>
+          <div>
+            <input type="text" class="form-input" id="field-video" placeholder="Video path (.mp4)">
+          </div>
+        </div>
+        <div class="form-hint">Leave blank if no media. Bluesky and Mastodon support images only.</div>
+      </div>
+
+      <!-- Per-network content tabs -->
+      <div class="form-row content-tabs">
+        <label class="form-label">Content per network</label>
+        <div class="tab-bar" id="content-tab-bar"></div>
+        <div id="content-tab-panels"></div>
+      </div>
+
+      <!-- Schedule -->
+      <div class="form-row">
+        <label class="form-label">Schedule</label>
+        <div class="schedule-options">
+
+          <div class="schedule-option selected" id="sched-auto-option" onclick="selectScheduleMode('auto')">
+            <input type="radio" name="schedule-mode" value="auto" checked>
+            <div>
+              <div class="schedule-option-label">Auto — next available slot</div>
+              <div class="schedule-option-desc" id="next-slot-label">Loading…</div>
+            </div>
+          </div>
+
+          <div class="schedule-option" id="sched-manual-option" onclick="selectScheduleMode('manual')">
+            <input type="radio" name="schedule-mode" value="manual">
+            <div style="width:100%">
+              <div class="schedule-option-label">Manual — pick a slot</div>
+              <div class="schedule-option-desc">Choose a specific date and time window</div>
+              <div class="manual-slot-picker hidden" id="manual-slot-picker">
+                <div>
+                  <label class="form-label" style="margin-top:10px">Date</label>
+                  <input type="date" class="form-input" id="field-slot-date">
+                </div>
+                <div>
+                  <label class="form-label" style="margin-top:10px">Window</label>
+                  <select class="form-input" id="field-slot-window"></select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" id="modal-cancel">Cancel</button>
+      <button class="btn-primary" id="modal-post-now" style="background:#5b9cf6">Post Now</button>
+      <button class="btn-primary" id="modal-submit">Schedule Post</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Confirm Delete Modal ── -->
+<div class="modal-overlay hidden" id="confirm-overlay">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <div class="modal-title">Delete Post</div>
+      <button class="modal-close" onclick="closeConfirm()">×</button>
+    </div>
+    <div class="confirm-message" id="confirm-message"></div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeConfirm()">Cancel</button>
+      <button class="btn-primary" id="confirm-ok" style="background:var(--failed);color:#fff">Delete</button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+const API = 'http://192.168.86.232:3111/api';
+
+const NETWORKS = ['x','linkedin','bluesky','discord','facebook','telegram'];
+
+const NET_INFO = {
+  x:        { label: 'X',        dot: 'dot-x',        limit: 600,   limitNote: 'Max 600 chars · single post · NO external links' },
+  linkedin: { label: 'LinkedIn', dot: 'dot-linkedin',  limit: 3000,  limitNote: 'Max 3000 chars' },
+  bluesky:  { label: 'Bluesky',  dot: 'dot-bluesky',   limit: 300,   limitNote: 'Max 300 chars · single post · images only' },
+  discord:  { label: 'Discord',  dot: 'dot-discord',   limit: 2000,  limitNote: 'Max 2000 chars' },
+  facebook: { label: 'Facebook', dot: 'dot-facebook',  limit: 63206, limitNote: 'No practical limit' },
+  telegram: { label: 'Telegram', dot: 'dot-telegram',  limit: 4096,  limitNote: 'Max 4096 chars · supports *bold* _italic_ `code`' },
+};
+
+// ── State ─────────────────────────────────────────────────────────────────────
+
+const state = {
+  view:       'upcoming',
+  queue:      { posts: [] },
+  archive:    { posts: [] },
+  slots:      [],
+  config:     null,
+  nextSlot:   null,
+  online:     false,
+  editingId:  null,
+  schedMode:  'auto',
+};
+
+const SLOT_PALETTE = ['#5b9cf6','#4caf82','#d4a843','#e07c30','#b366f0','#e85a8e','#5dd6f8','#9ad04a'];
+function slotColor(wi) { return SLOT_PALETTE[wi % SLOT_PALETTE.length]; }
+
+// ── API helpers ───────────────────────────────────────────────────────────────
+
+async function api(method, path, body) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(API + path, opts);
+  const json = await r.json();
+  if (!r.ok) throw new Error(json.error || `HTTP ${r.status}`);
+  return json;
+}
+
+// ── Time formatting ───────────────────────────────────────────────────────────
+
+const AEST_FMT = new Intl.DateTimeFormat('en-AU', {
+  timeZone:    'Australia/Brisbane',
+  weekday:     'short',
+  day:         'numeric',
+  month:       'short',
+  hour:        'numeric',
+  minute:      '2-digit',
+  hour12:      true,
+});
+
+const AEST_DATE_FMT = new Intl.DateTimeFormat('en-AU', {
+  timeZone: 'Australia/Brisbane',
+  year:     'numeric',
+  month:    'short',
+  day:      'numeric',
+});
+
+function fmtAEST(iso)     { return AEST_FMT.format(new Date(iso)); }
+function fmtDateAEST(iso) { return AEST_DATE_FMT.format(new Date(iso)); }
+
+// ── Network pills HTML ────────────────────────────────────────────────────────
+
+function networkPills(networks) {
+  return (networks || []).map(n => `<span class="net-pill net-${n}">${NET_INFO[n]?.label || n}</span>`).join('');
+}
+
+// ── Status pill ───────────────────────────────────────────────────────────────
+
+function statusPill(status) {
+  return `<span class="status-pill status-${status}">${status}</span>`;
+}
+
+// ── Post card ─────────────────────────────────────────────────────────────────
+
+function cardPreview(post) {
+  const n = post.networks?.[0];
+  if (!n || !post.content?.[n]) return '';
+  const c = post.content[n];
+  let text = '';
+  if (n === 'x')       text = xSegments(c)[0] || '';
+  else if (n === 'facebook') text = c.message || c.text || '';
+  else                 text = c.text || '';
+  return String(text).replace(/\n/g, ' ').slice(0, 160);
+}
+
+function renderPostCard(post, opts = {}) {
+  const { showStatus = false, showRetry = false, draggable = false } = opts;
+  const wi = parseSlotWindowIndex(post.slotKey);
+  const bar = wi != null
+    ? `<span class="slot-bar" style="background:${slotColor(wi)}"></span>`
+    : '';
+  const slotLabel = wi != null && state.config?.timeWindows?.[wi]
+    ? `<span class="card-time" style="color:${slotColor(wi)}">${escHtml(state.config.timeWindows[wi].label)}</span>`
+    : '';
+
+  const resultRows = showStatus && post.results && Object.keys(post.results).length
+    ? `<div class="card-status-row">
+        ${post.networks.map(n => {
+          const r = post.results[n];
+          if (!r) return '';
+          if (r.ok)      return `<div class="network-result result-ok">✓ ${NET_INFO[n]?.label || n}</div>`;
+          if (r.skipped) return `<div class="network-result result-skip">— ${NET_INFO[n]?.label || n}: ${r.error}</div>`;
+          return `<div class="network-result result-fail">✗ ${NET_INFO[n]?.label || n}: ${escHtml(r.error || 'failed')}</div>`;
+        }).join('')}
+      </div>`
+    : '';
+
+  const retryBtn  = showRetry ? `<button class="btn-sm success" onclick="retryPost('${post.id}')">Retry</button>` : '';
+
+  return `
+    <div class="post-card" id="card-${post.id}"${draggable ? ` draggable="true" ondragstart="onPostDragStart(event,'${post.id}')" ondragend="onPostDragEnd(event)"` : ''}>
+      ${bar}
+      <div class="card-header">
+        <div class="card-meta">
+          <div class="card-networks">${networkPills(post.networks)}</div>
+          ${slotLabel}
+          <div class="card-time">${fmtAEST(post.scheduledFor)}</div>
+          ${showStatus ? statusPill(post.status) : ''}
+        </div>
+        <div class="card-actions">
+          ${retryBtn}
+          <button class="btn-sm" onclick="editPost('${post.id}')">Edit</button>
+          <button class="btn-sm danger" onclick="confirmDelete('${post.id}')">Delete</button>
+        </div>
+      </div>
+      <div class="card-title">${escHtml(post.title)}</div>
+      <div class="card-preview">${escHtml(cardPreview(post))}</div>
+      ${resultRows}
+    </div>`;
+}
+
+// ── Views ─────────────────────────────────────────────────────────────────────
+
+function parseSlotWindowIndex(slotKey) {
+  if (!slotKey) return null;
+  const m = String(slotKey).match(/-(\d+)$/);
+  return m ? parseInt(m[1], 10) : null;
+}
+
+function renderUpcoming() {
+  const posts = state.queue.posts.filter(p => p.status === 'scheduled' || p.status === 'posting');
+  const postById = Object.fromEntries(posts.map(p => [p.id, p]));
+  const now = new Date();
+  // Today's date in Brisbane (YYYY-MM-DD)
+  const todayStr = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Australia/Brisbane', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).format(now);
+  const days = (state.slots || []).filter(d => d.date >= todayStr);
+
+  if (!days.length && !posts.length) {
+    return `<div class="empty-state"><h3>No upcoming posts</h3><p>Click <strong>+ Add Post</strong> to schedule one.</p></div>`;
+  }
+
+  // Track posts already rendered via slots so we can show orphans (no slotKey or slotKey out of range)
+  const renderedIds = new Set();
+
+  const html = days.map(day => {
+    // Sort slots chronologically by start time
+    const sorted = day.slots.slice().sort((a, b) =>
+      (a.window?.start || '').localeCompare(b.window?.start || '')
+    );
+
+    // For today, drop slots whose end time has already passed
+    const visible = sorted.filter(s => !s.past);
+    if (!visible.length) return '';
+
+    const heading = fmtDateAEST(day.date + 'T12:00:00+10:00');
+
+    const rows = visible.map(s => {
+      if (s.occupied && s.post && postById[s.post.id]) {
+        renderedIds.add(s.post.id);
+        return renderPostCard(postById[s.post.id], { draggable: true });
+      }
+      const winLabel = s.window?.label || '';
+      const winRange = s.window ? `${s.window.start}–${s.window.end}` : '';
+      return `<div class="slot-empty"
+            data-slot-key="${s.key}"
+            data-window-index="${s.windowIndex}"
+            data-date="${s.date}"
+            ondragover="onSlotDragOver(event)"
+            ondragleave="onSlotDragLeave(event)"
+            ondrop="onSlotDrop(event)">
+          <span class="slot-bar" style="background:${slotColor(s.windowIndex)}"></span>
+          <span>+ available — ${escHtml(winLabel)}</span>
+          <span class="slot-empty-time">${winRange}</span>
+        </div>`;
+    }).join('');
+
+    return `<div class="section-heading">${heading}</div>${rows}`;
+  }).join('');
+
+  // Orphan posts (slotKey missing or out of current calendar range)
+  const orphans = posts.filter(p => !renderedIds.has(p.id));
+  const orphanHtml = orphans.length
+    ? `<div class="section-heading">Other</div>` + orphans.map(p => renderPostCard(p, { draggable: true })).join('')
+    : '';
+
+  return (html || '') + orphanHtml || `<div class="empty-state"><h3>No upcoming posts</h3><p>Click <strong>+ Add Post</strong> to schedule one.</p></div>`;
+}
+
+// ── Drag and drop ─────────────────────────────────────────────────────────────
+
+function onPostDragStart(e, postId) {
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', postId);
+  e.currentTarget.classList.add('dragging');
+}
+
+function onPostDragEnd(e) {
+  e.currentTarget.classList.remove('dragging');
+}
+
+function onSlotDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  e.currentTarget.classList.add('drag-over');
+}
+
+function onSlotDragLeave(e) {
+  e.currentTarget.classList.remove('drag-over');
+}
+
+async function onSlotDrop(e) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  const postId = e.dataTransfer.getData('text/plain');
+  if (!postId) return;
+
+  const slotKey = e.currentTarget.dataset.slotKey;
+  const wi      = parseInt(e.currentTarget.dataset.windowIndex, 10);
+  const date    = e.currentTarget.dataset.date; // YYYY-MM-DD
+  const win     = state.config?.timeWindows?.[wi];
+  if (!win || !date) return showToast('Invalid slot', true);
+
+  const post = state.queue.posts.find(p => p.id === postId);
+  if (post && post.slotKey === slotKey) return; // dropped on its own slot
+
+  // Pick a random time within the window. For today, ensure it's at least 1 minute in the future.
+  const dayDate = new Date(date + 'T00:00:00');
+  const [sh, sm] = win.start.split(':').map(Number);
+  const [eh, em] = win.end.split(':').map(Number);
+  const start = new Date(dayDate); start.setHours(sh, sm, 0, 0);
+  const end   = new Date(dayDate); end.setHours(eh, em, 0, 0);
+  const earliest = new Date(Math.max(start.getTime(), Date.now() + 60_000));
+  if (earliest >= end) return showToast('That window has already passed', true);
+  const random = new Date(earliest.getTime() + Math.random() * (end.getTime() - earliest.getTime()));
+
+  try {
+    await api('PUT', '/posts/' + postId, {
+      slotKey,
+      scheduledFor: random.toISOString(),
+    });
+    showToast(`Moved to ${win.label}`);
+    loadData();
+  } catch (err) {
+    showToast('Error: ' + err.message, true);
+  }
+}
+
+function renderFailed() {
+  const posts = state.queue.posts.filter(p => ['failed','partial'].includes(p.status));
+  if (!posts.length) {
+    return `<div class="empty-state"><h3>No failed posts</h3><p>All posts are running smoothly.</p></div>`;
+  }
+  return posts.map(p => renderPostCard(p, { showStatus: true, showRetry: true })).join('');
+}
+
+function renderArchive() {
+  const posts = state.archive.posts;
+  if (!posts.length) {
+    return `<div class="empty-state"><h3>No archived posts</h3><p>Successfully posted content will appear here.</p></div>`;
+  }
+
+  const rows = posts.map(p => `
+    <tr>
+      <td>${escHtml(p.title)}</td>
+      <td>${networkPills(p.networks)}</td>
+      <td style="white-space:nowrap;font-family:var(--mono);font-size:11px">${fmtAEST(p.postedAt || p.scheduledFor)}</td>
+      <td style="font-size:11px;color:var(--text-muted)">${escHtml(cardPreview(p)).slice(0, 80)}</td>
+    </tr>`).join('');
+
+  return `
+    <table class="archive-table">
+      <thead><tr>
+        <th>Title</th>
+        <th>Networks</th>
+        <th>Posted</th>
+        <th>Preview</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+function renderSettings() {
+  const cfg  = state.config || {};
+  if (cfg.timeWindows) cfg.timeWindows.sort((a, b) => (a.start || '').localeCompare(b.start || ''));
+  const wins = (cfg.timeWindows || []);
+
+  const windowRows = wins.map((w, i) => `
+    <div class="time-window-row" id="win-row-${i}">
+      <input class="form-input field-input" value="${escHtml(w.label)}" placeholder="Label" oninput="updateWindow(${i},'label',this.value)">
+      <input class="form-input field-input" type="time" value="${w.start}" oninput="updateWindow(${i},'start',this.value)">
+      <input class="form-input field-input" type="time" value="${w.end}"   oninput="updateWindow(${i},'end',this.value)">
+      <button class="btn-remove" onclick="removeWindow(${i})" title="Remove">×</button>
+    </div>`).join('');
+
+  return `
+    <div class="settings-section">
+      <div class="settings-title">Time Windows (AEST)</div>
+      <div class="settings-desc">Posts are scheduled at a random time within each window. Only one post per window per day.</div>
+      <div style="display:grid;grid-template-columns:100px 1fr 1fr 40px;gap:8px;margin-bottom:4px">
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text-dim)">LABEL</span>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text-dim)">START</span>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text-dim)">END</span>
+        <span></span>
+      </div>
+      <div id="window-rows">${windowRows}</div>
+      <button class="btn-secondary" onclick="addWindow()">+ Add Window</button>
+    </div>
+    <div style="display:flex;gap:10px">
+      <button class="btn-primary" onclick="saveSettings()">Save Settings</button>
+    </div>`;
+}
+
+// ── Settings actions ──────────────────────────────────────────────────────────
+
+function updateWindow(i, field, val) {
+  if (!state.config.timeWindows[i]) return;
+  state.config.timeWindows[i][field] = val;
+}
+
+function removeWindow(i) {
+  state.config.timeWindows.splice(i, 1);
+  setViewContent(renderSettings());
+}
+
+function addWindow() {
+  state.config.timeWindows.push({ label: 'New', start: '20:00', end: '21:00' });
+  setViewContent(renderSettings());
+}
+
+async function saveSettings() {
+  try {
+    await api('PUT', '/config', { timeWindows: state.config.timeWindows });
+    showToast('Settings saved');
+    loadData();
+  } catch (e) {
+    showToast('Error: ' + e.message, true);
+  }
+}
+
+// ── Router ────────────────────────────────────────────────────────────────────
+
+const VIEW_TITLES = { upcoming: 'Upcoming', failed: 'Failed / Partial', archive: 'Archive', settings: 'Settings' };
+
+function setView(view) {
+  state.view = view;
+  document.querySelectorAll('.nav-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.view === view);
+  });
+  document.getElementById('view-title').textContent = VIEW_TITLES[view] || view;
+  renderCurrentView();
+  updateCountdownLabel();
+}
+
+function setViewContent(html) {
+  document.getElementById('view-content').innerHTML = html;
+}
+
+function renderCurrentView() {
+  const map = {
+    upcoming: renderUpcoming,
+    failed:   renderFailed,
+    archive:  renderArchive,
+    settings: renderSettings,
+  };
+  setViewContent((map[state.view] || renderUpcoming)());
+}
+
+// ── Badges ────────────────────────────────────────────────────────────────────
+
+function updateBadges() {
+  const upcoming = state.queue.posts.filter(p => ['scheduled','posting'].includes(p.status)).length;
+  const failed   = state.queue.posts.filter(p => ['failed','partial'].includes(p.status)).length;
+  const archived = state.archive.posts.length;
+
+  document.getElementById('badge-upcoming').textContent = upcoming;
+  document.getElementById('badge-failed').textContent   = failed;
+  document.getElementById('badge-archive').textContent  = archived;
+
+  const fb = document.getElementById('badge-failed');
+  fb.className = failed > 0 ? 'badge badge-failed' : 'badge';
+}
+
+// ── Server status ─────────────────────────────────────────────────────────────
+
+function setOnline(online) {
+  state.online = online;
+  const dot  = document.getElementById('status-dot');
+  const txt  = document.getElementById('status-text');
+  const ban  = document.getElementById('offline-banner');
+  dot.className  = 'status-dot ' + (online ? 'online' : 'offline');
+  txt.textContent = online ? 'Server online' : 'Server offline';
+  ban.style.display = online ? 'none' : 'block';
+}
+
+// ── Data loading ──────────────────────────────────────────────────────────────
+
+async function loadData() {
+  try {
+    await api('GET', '/health');
+    setOnline(true);
+  } catch {
+    setOnline(false);
+    return;
+  }
+
+  try {
+    const [q, a, cfg, slot, slots] = await Promise.all([
+      api('GET', '/posts'),
+      api('GET', '/archive'),
+      api('GET', '/config'),
+      api('GET', '/next-slot'),
+      api('GET', '/slots?days=14'),
+    ]);
+    state.queue   = q;
+    state.archive = a;
+    state.config  = cfg;
+    state.slots   = Array.isArray(slots) ? slots : [];
+    state.nextSlot = slot?.scheduledFor ? slot : null;
+
+    updateBadges();
+    renderCurrentView();
+
+    if (state.nextSlot) {
+      document.getElementById('next-slot-label').textContent =
+        'Next free slot: ' + fmtAEST(state.nextSlot.scheduledFor) + ' (' + (state.nextSlot.window || '') + ')';
+    } else {
+      document.getElementById('next-slot-label').textContent = 'No slots available in the next 60 days';
+    }
+
+    // Populate manual slot window dropdown if config loaded
+    populateWindowSelect();
+  } catch (e) {
+    console.error('loadData error:', e);
+  }
+}
+
+// ── Delete confirm ────────────────────────────────────────────────────────────
+
+function confirmDelete(id) {
+  const post = state.queue.posts.find(p => p.id === id) || state.archive.posts.find(p => p.id === id);
+  const title = post?.title || 'this post';
+  document.getElementById('confirm-message').innerHTML =
+    `Are you sure you want to delete <strong>${escHtml(title)}</strong>? This cannot be undone.`;
+  document.getElementById('confirm-ok').onclick = async () => {
+    try {
+      await api('DELETE', '/posts/' + id);
+      closeConfirm();
+      loadData();
+    } catch (e) {
+      showToast('Error: ' + e.message, true);
+    }
+  };
+  document.getElementById('confirm-overlay').classList.remove('hidden');
+}
+
+function closeConfirm() {
+  document.getElementById('confirm-overlay').classList.add('hidden');
+}
+
+// ── Retry ─────────────────────────────────────────────────────────────────────
+
+async function retryPost(id) {
+  try {
+    await api('POST', '/posts/' + id + '/retry');
+    showToast('Post rescheduled for retry');
+    loadData();
+  } catch (e) {
+    showToast('Error: ' + e.message, true);
+  }
+}
+
+// ── Modal: open / close ───────────────────────────────────────────────────────
+
+function openModal(post = null) {
+  state.editingId = post?.id || null;
+  document.getElementById('modal-title').textContent = post ? 'Edit Post' : 'Add Post';
+  document.getElementById('modal-submit').textContent = post ? 'Save Changes' : 'Schedule Post';
+  document.getElementById('modal-overlay').classList.remove('hidden');
+
+  // Reset form
+  document.getElementById('json-import').value = '';
+  document.getElementById('parse-error').style.display = 'none';
+  document.getElementById('field-title').value = '';
+  document.getElementById('field-image').value = '';
+  document.getElementById('field-video').value = '';
+  NETWORKS.forEach(n => { document.getElementById('net-' + n).checked = false; });
+  selectScheduleMode('auto');
+
+  if (post) {
+    document.getElementById('field-title').value = post.title || '';
+    document.getElementById('field-image').value = post.media?.image || '';
+    document.getElementById('field-video').value = post.media?.video || '';
+    (post.networks || []).forEach(n => {
+      const el = document.getElementById('net-' + n);
+      if (el) el.checked = true;
+    });
+    state._editContent = post.content || {};
+  } else {
+    state._editContent = {};
+  }
+
+  rebuildContentTabs();
+  populateWindowSelect();
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.add('hidden');
+  state.editingId = null;
+  state._editContent = {};
+}
+
+// ── Schedule mode ─────────────────────────────────────────────────────────────
+
+function selectScheduleMode(mode) {
+  state.schedMode = mode;
+  document.getElementById('sched-auto-option').classList.toggle('selected',   mode === 'auto');
+  document.getElementById('sched-manual-option').classList.toggle('selected', mode === 'manual');
+  document.querySelector('#sched-auto-option input').checked   = mode === 'auto';
+  document.querySelector('#sched-manual-option input').checked = mode === 'manual';
+
+  const picker = document.getElementById('manual-slot-picker');
+  if (mode === 'manual') {
+    picker.classList.remove('hidden');
+    // Default date to tomorrow
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    document.getElementById('field-slot-date').value = tomorrow.toISOString().slice(0, 10);
+  } else {
+    picker.classList.add('hidden');
+  }
+}
+
+function populateWindowSelect() {
+  const sel = document.getElementById('field-slot-window');
+  if (!sel || !state.config?.timeWindows) return;
+  sel.innerHTML = state.config.timeWindows.map((w, i) =>
+    `<option value="${i}">${w.label} (${w.start}–${w.end})</option>`
+  ).join('');
+}
+
+// ── Content tabs ──────────────────────────────────────────────────────────────
+
+function getCheckedNetworks() {
+  return NETWORKS.filter(n => document.getElementById('net-' + n)?.checked);
+}
+
+function rebuildContentTabs() {
+  const nets  = getCheckedNetworks();
+  const bar   = document.getElementById('content-tab-bar');
+  const panel = document.getElementById('content-tab-panels');
+
+  if (!nets.length) {
+    bar.innerHTML   = '';
+    panel.innerHTML = '<div style="padding:12px 0;color:var(--text-dim);font-size:12px">Select at least one network above.</div>';
+    return;
+  }
+
+  bar.innerHTML = nets.map((n, i) =>
+    `<button class="tab-btn ${i === 0 ? 'active' : ''}" onclick="switchTab('${n}')" id="tab-btn-${n}">${NET_INFO[n].label}</button>`
+  ).join('');
+
+  panel.innerHTML = nets.map((n, i) => {
+    const content = state._editContent?.[n] || {};
+    return `<div class="tab-panel ${i === 0 ? 'active' : ''}" id="tab-panel-${n}">
+      ${buildNetworkForm(n, content)}
+    </div>`;
+  }).join('');
+}
+
+function switchTab(network) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  const btn = document.getElementById('tab-btn-' + network);
+  const pnl = document.getElementById('tab-panel-' + network);
+  if (btn) btn.classList.add('active');
+  if (pnl) pnl.classList.add('active');
+}
+
+function buildNetworkForm(network, content) {
+  const info = NET_INFO[network];
+  const hint = `<div class="form-hint" style="margin-bottom:12px">${info.limitNote}</div>`;
+
+  if (network === 'x') {
+    const segments = xSegments(content);
+    const mode = segments.length > 1 ? 'thread' : 'text';
+    return `${hint}
+      <div class="form-row">
+        <label class="form-label">X Content <span class="char-count" id="cc-x">${segments.join('\n\n').length} / 600</span></label>
+        <input type="hidden" id="field-x-mode" value="${mode}">
+        <div class="tweet-list" id="tweet-list">
+          ${segments.map((t, i) => tweetRow(t, i)).join('')}
+        </div>
+        <button class="btn-add-tweet" type="button" onclick="addTweet()">+ Add thread post</button>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Quoted X Post URL (optional)</label>
+        <input class="form-input" type="url" id="field-x-quoted-post" value="${escHtml(content.quotedPost || '')}" placeholder="https://x.com/.../status/...">
+      </div>
+      <div class="form-hint" style="margin-top:8px">Use one box for a single post, or add more boxes for a thread. No external links outside X. Images and video are supported via the main media fields.</div>`;
+  }
+
+  if (network === 'linkedin') {
+    return `${hint}
+      <div class="form-row">
+        <label class="form-label">Text <span class="char-count" id="cc-linkedin">0 / 3000</span></label>
+        <textarea class="form-input" id="field-linkedin-text" rows="6" oninput="updateCharCount('linkedin',this.value,3000)">${escHtml(content.text || '')}</textarea>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Article Link (optional)</label>
+        <input class="form-input" type="url" id="field-linkedin-link" value="${escHtml(content.link || '')}">
+      </div>`;
+  }
+
+  if (network === 'bluesky') {
+    return `${hint}
+      <div class="form-row">
+        <label class="form-label">Text <span class="char-count" id="cc-bluesky">0 / 300</span></label>
+        <textarea class="form-input" id="field-bluesky-text" rows="4" oninput="updateCharCount('bluesky',this.value,300)">${escHtml(content.text || '')}</textarea>
+      </div>`;
+  }
+
+  if (network === 'discord') {
+    return `${hint}
+      <div class="form-row">
+        <label class="form-label">Message <span class="char-count" id="cc-discord">0 / 2000</span></label>
+        <textarea class="form-input" id="field-discord-text" rows="4" oninput="updateCharCount('discord',this.value,2000)">${escHtml(content.text || '')}</textarea>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Embed Title (optional)</label>
+        <input class="form-input" type="text" id="field-discord-title" value="${escHtml(content.title || '')}">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Embed Description (optional)</label>
+        <input class="form-input" type="text" id="field-discord-description" value="${escHtml(content.description || '')}">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Link (optional)</label>
+        <input class="form-input" type="url" id="field-discord-link" value="${escHtml(content.link || '')}">
+      </div>`;
+  }
+
+  if (network === 'facebook') {
+    return `${hint}
+      <div class="form-row">
+        <label class="form-label">Message</label>
+        <textarea class="form-input" id="field-facebook-message" rows="5">${escHtml(content.message || content.text || '')}</textarea>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Link (optional)</label>
+        <input class="form-input" type="url" id="field-facebook-link" value="${escHtml(content.link || '')}">
+      </div>`;
+  }
+
+  if (network === 'mastodon') {
+    return `${hint}
+      <div class="form-row">
+        <label class="form-label">Text <span class="char-count" id="cc-mastodon">0 / 500</span></label>
+        <textarea class="form-input" id="field-mastodon-text" rows="4" oninput="updateCharCount('mastodon',this.value,500)">${escHtml(content.text || '')}</textarea>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Link (optional)</label>
+        <input class="form-input" type="url" id="field-mastodon-link" value="${escHtml(content.link || '')}">
+      </div>`;
+  }
+
+  if (network === 'telegram') {
+    return `${hint}
+      <div class="form-row">
+        <label class="form-label">Message <span class="char-count" id="cc-telegram">0 / 4096</span></label>
+        <textarea class="form-input" id="field-telegram-text" rows="6" oninput="updateCharCount('telegram',this.value,4096)">${escHtml(content.text || '')}</textarea>
+      </div>`;
+  }
+
+  return `<div style="color:var(--text-dim);font-size:12px">Unsupported network: ${escHtml(network)}</div>`;
+}
+
+function tweetRow(text, index) {
+  return `<div class="tweet-row" id="tweet-${index}">
+    <span class="tweet-num">${index + 1}</span>
+    <textarea class="form-input" rows="3" placeholder="Tweet ${index + 1} (max 280 chars)"
+      oninput="checkTweetLen(this);updateXThreadCount()">${escHtml(text)}</textarea>
+    <button class="btn-remove-tweet" onclick="removeTweet(this)" title="Remove tweet">×</button>
+  </div>`;
+}
+
+function checkTweetLen(el) {
+  const over = el.value.length > 280;
+  el.style.borderColor = over ? 'var(--failed)' : '';
+}
+
+function updateXThreadCount() {
+  const el = document.getElementById('cc-x');
+  const list = document.getElementById('tweet-list');
+  if (!el || !list) return;
+  const len = Array.from(list.querySelectorAll('textarea')).reduce((sum, ta) => sum + ta.value.length, 0);
+  el.textContent = `${len} / 600`;
+  el.className = 'char-count' + (len > 600 ? ' over' : '');
+}
+
+function addTweet() {
+  const list = document.getElementById('tweet-list');
+  const idx  = list.children.length;
+  const div  = document.createElement('div');
+  div.innerHTML = tweetRow('', idx);
+  list.appendChild(div.firstElementChild);
+  const mode = document.getElementById('field-x-mode');
+  if (mode) mode.value = 'thread';
+  renumberTweets();
+  updateXThreadCount();
+}
+
+function removeTweet(btn) {
+  const row = btn.closest('.tweet-row');
+  if (row) row.remove();
+  const mode = document.getElementById('field-x-mode');
+  const list = document.getElementById('tweet-list');
+  if (list && list.children.length === 0) {
+    const div = document.createElement('div');
+    div.innerHTML = tweetRow('', 0);
+    list.appendChild(div.firstElementChild);
+  }
+  if (mode && list && list.children.length <= 1) mode.value = 'text';
+  renumberTweets();
+  updateXThreadCount();
+}
+
+function renumberTweets() {
+  document.querySelectorAll('.tweet-row').forEach((row, i) => {
+    row.id = 'tweet-' + i;
+    const num = row.querySelector('.tweet-num');
+    if (num) num.textContent = i + 1;
+    const ta = row.querySelector('textarea');
+    if (ta) ta.placeholder = `Tweet ${i + 1} (max 280 chars)`;
+  });
+}
+
+function updateCharCount(network, value, max) {
+  const el = document.getElementById('cc-' + network);
+  if (!el) return;
+  const len = value.length;
+  el.textContent = `${len} / ${max}`;
+  el.className = 'char-count' + (len > max ? ' over' : '');
+}
+
+function xSegments(content) {
+  if (!content) return [''];
+  if (Array.isArray(content.thread) && content.thread.length) {
+    return content.thread.map(v => String(v ?? '').trim()).filter(Boolean) || [''];
+  }
+  if (Array.isArray(content.text) && content.text.length) {
+    return content.text.map(v => String(v ?? '').trim()).filter(Boolean) || [''];
+  }
+  if (typeof content.text === 'string' && content.text.trim()) return [content.text.trim()];
+  return [''];
+}
+
+// ── JSON import / parse ───────────────────────────────────────────────────────
+
+function parseJsonImport() {
+  const raw  = document.getElementById('json-import').value.trim();
+  const errEl = document.getElementById('parse-error');
+  errEl.style.display = 'none';
+
+  if (!raw) return;
+
+  let data;
+  try { data = JSON.parse(raw); }
+  catch (e) {
+    errEl.textContent  = 'Invalid JSON: ' + e.message;
+    errEl.style.display = 'block';
+    return;
+  }
+
+  // Populate fields from template
+  if (data.title)    document.getElementById('field-title').value = data.title;
+  if (data.media?.image) document.getElementById('field-image').value = data.media.image;
+  if (data.media?.video) document.getElementById('field-video').value = data.media.video;
+
+  if (Array.isArray(data.networks)) {
+    NETWORKS.forEach(n => {
+      const el = document.getElementById('net-' + n);
+      if (el) el.checked = data.networks.includes(n);
+    });
+  }
+
+  state._editContent = data.content || {};
+  rebuildContentTabs();
+
+  // Populate char counts
+  setTimeout(() => {
+    ['linkedin','bluesky','discord','mastodon','telegram'].forEach(n => {
+      const ta = document.getElementById('field-' + n + '-text');
+      if (ta) updateCharCount(n, ta.value, NET_INFO[n].limit);
+    });
+  }, 50);
+}
+
+// ── Collect form data ─────────────────────────────────────────────────────────
+
+function collectContent() {
+  const networks = getCheckedNetworks();
+  const content  = {};
+
+  for (const n of networks) {
+    if (n === 'x') {
+      const mode = document.getElementById('field-x-mode')?.value || 'text';
+      const quotedPost = document.getElementById('field-x-quoted-post')?.value.trim();
+      const tweets = Array.from(document.querySelectorAll('#tweet-list .tweet-row textarea'))
+        .map(ta => ta.value.trim()).filter(Boolean);
+
+      if (mode === 'thread' || tweets.length > 1) {
+        content.x = { thread: tweets };
+      } else if (tweets.length === 1) {
+        content.x = { text: tweets[0] };
+      }
+
+      if (content.x && quotedPost) content.x.quotedPost = quotedPost;
+    } else if (n === 'linkedin') {
+      const text = document.getElementById('field-linkedin-text')?.value.trim();
+      const link = document.getElementById('field-linkedin-link')?.value.trim();
+      if (text || link) content.linkedin = { text, link: link || undefined };
+    } else if (n === 'bluesky') {
+      const text = document.getElementById('field-bluesky-text')?.value.trim();
+      if (text) content.bluesky = { text };
+    } else if (n === 'discord') {
+      const text = document.getElementById('field-discord-text')?.value.trim();
+      const title = document.getElementById('field-discord-title')?.value.trim();
+      const description = document.getElementById('field-discord-description')?.value.trim();
+      const link = document.getElementById('field-discord-link')?.value.trim();
+      if (text || title) content.discord = { text, title: title || undefined, description: description || undefined, link: link || undefined };
+    } else if (n === 'facebook') {
+      const message = document.getElementById('field-facebook-message')?.value.trim();
+      const link = document.getElementById('field-facebook-link')?.value.trim();
+      if (message || link) content.facebook = { message, link: link || undefined };
+    } else if (n === 'mastodon') {
+      const text = document.getElementById('field-mastodon-text')?.value.trim();
+      const link = document.getElementById('field-mastodon-link')?.value.trim();
+      if (text) content.mastodon = { text, link: link || undefined };
+    } else if (n === 'telegram') {
+      const text = document.getElementById('field-telegram-text')?.value.trim();
+      if (text) content.telegram = { text };
+    }
+  }
+
+  return content;
+}
+
+// ── Submit ────────────────────────────────────────────────────────────────────
+
+async function submitPost() {
+  const title    = document.getElementById('field-title').value.trim();
+  const image    = document.getElementById('field-image').value.trim();
+  const video    = document.getElementById('field-video').value.trim();
+  const networks = getCheckedNetworks();
+  const content  = collectContent();
+
+  if (!title)           return showToast('Title is required', true);
+  if (!networks.length) return showToast('Select at least one network', true);
+  if (!Object.keys(content).length) return showToast('Add content for at least one network', true);
+
+  let scheduledFor, slotKey;
+
+  if (state.schedMode === 'manual') {
+    const date  = document.getElementById('field-slot-date').value;
+    const winI  = parseInt(document.getElementById('field-slot-window').value, 10);
+    const wins  = state.config?.timeWindows || [];
+    const win   = wins[winI];
+    if (!date || !win) return showToast('Select a valid date and window', true);
+
+    // Pick random time within the window for the chosen date
+    const dayDate = new Date(date + 'T00:00:00');
+    const [sh, sm] = win.start.split(':').map(Number);
+    const [eh, em] = win.end.split(':').map(Number);
+    const start  = new Date(dayDate); start.setHours(sh, sm, 0, 0);
+    const end    = new Date(dayDate); end.setHours(eh, em, 0, 0);
+    const random = new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime()));
+
+    const yy = dayDate.getFullYear();
+    const mm = String(dayDate.getMonth() + 1).padStart(2, '0');
+    const dd = String(dayDate.getDate()).padStart(2, '0');
+
+    scheduledFor = random.toISOString();
+    slotKey      = `${yy}-${mm}-${dd}-${winI}`;
+  }
+
+  const body = {
+    title, networks, content,
+    media: { image: image || null, video: video || null },
+    ...(scheduledFor ? { scheduledFor, slotKey } : {}),
+  };
+
+  const btn = document.getElementById('modal-submit');
+  btn.disabled = true;
+
+  try {
+    if (state.editingId) {
+      await api('PUT', '/posts/' + state.editingId, body);
+      showToast('Post updated');
+    } else {
+      await api('POST', '/posts', body);
+      showToast('Post scheduled');
+    }
+    closeModal();
+    loadData();
+  } catch (e) {
+    showToast('Error: ' + e.message, true);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ── Post Now ──────────────────────────────────────────────────────────────────
+
+async function postNow() {
+  const title    = document.getElementById('field-title').value.trim();
+  const image    = document.getElementById('field-image').value.trim();
+  const video    = document.getElementById('field-video').value.trim();
+  const networks = getCheckedNetworks();
+  const content  = collectContent();
+
+  if (!title)           return showToast('Title is required', true);
+  if (!networks.length) return showToast('Select at least one network', true);
+  if (!Object.keys(content).length) return showToast('Add content for at least one network', true);
+
+  const body = {
+    title, networks, content,
+    media: { image: image || null, video: video || null },
+    scheduledFor: new Date().toISOString(),
+  };
+
+  const btn = document.getElementById('modal-post-now');
+  btn.disabled = true;
+
+  try {
+    if (state.editingId) {
+      await api('PUT', '/posts/' + state.editingId, body);
+      showToast('Post queued for immediate sending');
+    } else {
+      await api('POST', '/posts', body);
+      showToast('Post queued for immediate sending');
+    }
+    closeModal();
+    loadData();
+  } catch (e) {
+    showToast('Error: ' + e.message, true);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ── Edit post ─────────────────────────────────────────────────────────────────
+
+function editPost(id) {
+  const post = state.queue.posts.find(p => p.id === id);
+  if (!post) return showToast('Post not found', true);
+  openModal(post);
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+
+let toastTimer;
+function showToast(msg, isError = false) {
+  let toast = document.getElementById('toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'toast';
+    toast.style.cssText = `
+      position:fixed;bottom:28px;right:28px;z-index:999;
+      background:var(--surface-3);border:1px solid var(--border);
+      color:var(--text);padding:10px 18px;border-radius:6px;
+      font-size:13px;transition:opacity 0.3s;
+      font-family:var(--sans);box-shadow:0 4px 20px rgba(0,0,0,.4);
+    `;
+    document.body.appendChild(toast);
+  }
+  if (isError) toast.style.borderColor = 'var(--failed)';
+  else         toast.style.borderColor = 'var(--border)';
+  toast.textContent = msg;
+  toast.style.opacity = '1';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { toast.style.opacity = '0'; }, 3000);
+}
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+
+function escHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// ── Event wiring ──────────────────────────────────────────────────────────────
+
+document.querySelectorAll('.nav-item[data-view]').forEach(el => {
+  el.addEventListener('click', () => setView(el.dataset.view));
+});
+
+document.getElementById('btn-add-post').addEventListener('click', () => openModal());
+document.getElementById('btn-refresh').addEventListener('click', () => { secondsUntilRefresh = REFRESH_INTERVAL; loadData(); });
+document.getElementById('modal-close').addEventListener('click', closeModal);
+document.getElementById('modal-cancel').addEventListener('click', closeModal);
+document.getElementById('modal-submit').addEventListener('click', submitPost);
+document.getElementById('btn-parse').addEventListener('click', parseJsonImport);
+
+// Re-build tabs when network selection changes
+NETWORKS.forEach(n => {
+  document.getElementById('net-' + n).addEventListener('change', rebuildContentTabs);
+});
+
+document.getElementById('modal-post-now').addEventListener('click', postNow);
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+
+const REFRESH_INTERVAL = 30;
+let secondsUntilRefresh = REFRESH_INTERVAL;
+
+function updateCountdownLabel() {
+  const el = document.getElementById('refresh-countdown');
+  if (!el) return;
+  if (state.view === 'settings') {
+    el.textContent = 'auto-refresh paused';
+  } else {
+    el.textContent = `refresh in ${secondsUntilRefresh}s`;
+  }
+}
+
+async function init() {
+  await loadData();
+  setInterval(() => {
+    secondsUntilRefresh--;
+    if (secondsUntilRefresh <= 0) {
+      secondsUntilRefresh = REFRESH_INTERVAL;
+      if (state.view !== 'settings') loadData();
+    }
+    updateCountdownLabel();
+  }, 1000);
+}
+
+init();
+</script>
+</body>
+</html>
