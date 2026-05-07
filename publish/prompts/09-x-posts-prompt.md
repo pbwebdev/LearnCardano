@@ -18,6 +18,7 @@ Read the metadata and YouTube result, then draft social posts for the episode la
 - Clean compliance throughout
 
 ## Per-network character limits (from scheduler)
+- **Aim for 450–580 chars on X posts**, not 250. Longer posts give you room to deliver a real claim, an opinion, and a question. Posts under ~300 chars usually read like a teaser around a link, which is one of the AI/corporate tells the rules ban.
 - x: 600 (single post — never a thread; never include external links)
 - bluesky: 300
 - linkedin: 3000
@@ -32,6 +33,22 @@ Read the metadata and YouTube result, then draft social posts for the episode la
   - On every other network (Bluesky, LinkedIn, Facebook, etc.): include the YouTube URL — those platforms don't penalise external links the way X does.
 - **Post 2 — Community / quote-tweet angle:** reply value, technical or community-specific take. Posted later (scheduler will pick a later slot automatically). Usually no media on X for this one — it's a follow-up text post.
 - **Post 3 — Takeaways:** condensed key insights. Single post per network, not a multi-tweet thread (the scheduler does not support threads — collapse the thread into one strong post per network).
+
+## Each post must have an image (`media.image`)
+
+Every post in `x-posts-queue.json` should ship with a `media.image` set to an absolute path on disk. Two-step resolution per post:
+
+1. **Try to match an existing image** in `/home/aiagent/.openclaw/workspace/content/`. Pull 2-4 keywords from the post angle (episode topic, project name, theme) and call:
+   ```bash
+   node scripts/generate-image.js --keywords "tweag peras spo" --slug <episode-slug>-<post-tag> \
+       --content-dir /home/aiagent/.openclaw/workspace/content --out auto \
+       --prompt "<fallback prompt — see step 2>"
+   ```
+   If a file in `content/` matches the keywords (≥half the terms appear in the basename), the script returns `{"source":"matched","file":"..."}` and skips generation.
+
+2. **Otherwise it generates** via OpenAI `gpt-image-1` and saves to `content/learn-cardano-<episode-slug>-<post-tag>.png`. Use a descriptive prompt that pictures the post's angle: a number transition, an operator-cost visual, a roadmap, etc. Avoid logos and avoid embedded text — X auto-crops thumbnails so text-in-image rarely survives. Aim for 16:9 (`--size 1536x1024`, the default) so the image fills the X feed card cleanly.
+
+Use a different prompt + slug for each of the 3 post variants so the launch / community / takeaways posts each have their own distinct image. Set `media.image` on each entry of `x-posts-queue.json` to the returned path.
 
 ## Choosing the video file for X (`media.video`)
 Look in `publish/upload/` and pick, in this priority order:
@@ -114,3 +131,5 @@ This writes `output/x-posts-queue-result.json` with the assigned slot for each p
 - [ ] Post 1 includes the YouTube URL on every non-X network (Bluesky, LinkedIn, Facebook)
 - [ ] No price predictions / financial advice
 - [ ] Each variant tells a distinct angle (launch / community / takeaways)
+- [ ] X posts are 450–580 chars (not 250) — substantive, not teasers
+- [ ] Every post has `media.image` set to an absolute path returned by `generate-image.js` (matched or generated)
