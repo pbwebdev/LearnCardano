@@ -273,6 +273,26 @@ body {
 .slot-empty.drag-over .slot-bar { opacity: 1; }
 .slot-empty-time { color: var(--text-muted); }
 
+.slot-empty.past {
+  border-style: solid;
+  border-color: var(--border);
+  background: #141414;
+  color: #555;
+  opacity: 0.7;
+}
+.slot-empty.past .slot-bar { opacity: 0.2; }
+.slot-empty.past .slot-empty-time { color: #555; }
+.slot-passed-tag {
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #777;
+  margin-left: auto;
+  border: 1px solid #333;
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+
 .card-header {
   display: flex;
   align-items: flex-start;
@@ -1074,6 +1094,7 @@ const AEST_FMT = new Intl.DateTimeFormat('en-AU', {
 
 const AEST_DATE_FMT = new Intl.DateTimeFormat('en-AU', {
   timeZone: 'Australia/Brisbane',
+  weekday:  'short',
   year:     'numeric',
   month:    'short',
   day:      'numeric',
@@ -1184,8 +1205,19 @@ function renderUpcoming() {
       (a.window?.start || '').localeCompare(b.window?.start || '')
     );
 
-    // For today, drop slots whose end time has already passed
-    const visible = sorted.filter(s => !s.past);
+    // Compute past status using Brisbane time (server may be UTC)
+    const nowMs = Date.now();
+    const slotPast = s => {
+      if (!s.window) return false;
+      const end = new Date(`${s.date}T${s.window.end}:00+10:00`);
+      return end.getTime() <= nowMs;
+    };
+
+    // Hide past empty slots for older days; for today, show them as "passed"
+    const visible = sorted.filter(s => {
+      if (s.occupied) return true;
+      return s.date >= todayStr && !(s.date < todayStr);
+    });
     if (!visible.length) return '';
 
     const heading = fmtDateAEST(day.date + 'T12:00:00+10:00');
@@ -1197,6 +1229,15 @@ function renderUpcoming() {
       }
       const winLabel = s.window?.label || '';
       const winRange = s.window ? `${s.window.start}–${s.window.end}` : '';
+      const past = slotPast(s);
+      if (past) {
+        return `<div class="slot-empty past">
+            <span class="slot-bar" style="background:${slotColor(s.windowIndex)}"></span>
+            <span>${escHtml(winLabel)}</span>
+            <span class="slot-empty-time">${winRange}</span>
+            <span class="slot-passed-tag">passed</span>
+          </div>`;
+      }
       return `<div class="slot-empty"
             data-slot-key="${s.key}"
             data-window-index="${s.windowIndex}"
