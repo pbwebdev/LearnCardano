@@ -1318,6 +1318,16 @@ function randomTimeInWindow(date, win) {
   return new Date(earliest.getTime() + Math.random() * (end.getTime() - earliest.getTime()));
 }
 
+// Derive a slotKey from a moment using its Brisbane local date.
+// Always do this client-side instead of trusting slot.key from /api/slots,
+// in case that calendar was generated under a different server timezone.
+function slotKeyFromMoment(iso, windowIndex) {
+  const d = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Australia/Brisbane', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).format(new Date(iso));
+  return `${d}-${windowIndex}`;
+}
+
 function slotKeyToParts(key) {
   // YYYY-MM-DD-{wi}
   const m = String(key).match(/^(\d{4}-\d{2}-\d{2})-(\d+)$/);
@@ -1364,10 +1374,15 @@ async function onCardDrop(e, targetId) {
   // 3. Move source into target's old slot
   const tempKey = `swap-tmp-${sourceId}-${Date.now()}`;
 
+  // Derive slotKeys from each new moment's Brisbane date — don't trust the
+  // stored source/target slotKeys, they may be stale.
+  const sNewKey = slotKeyFromMoment(sNewTime.toISOString(), tParts.wi);
+  const tNewKey = slotKeyFromMoment(tNewTime.toISOString(), sParts.wi);
+
   try {
     await api('PUT', '/posts/' + sourceId, { slotKey: tempKey, scheduledFor: source.scheduledFor });
-    await api('PUT', '/posts/' + targetId, { slotKey: source.slotKey, scheduledFor: tNewTime.toISOString() });
-    await api('PUT', '/posts/' + sourceId, { slotKey: target.slotKey, scheduledFor: sNewTime.toISOString() });
+    await api('PUT', '/posts/' + targetId, { slotKey: tNewKey, scheduledFor: tNewTime.toISOString() });
+    await api('PUT', '/posts/' + sourceId, { slotKey: sNewKey, scheduledFor: sNewTime.toISOString() });
     showToast(`Swapped ${sWin.label} ↔ ${tWin.label}`);
     loadData();
   } catch (err) {
@@ -1382,24 +1397,19 @@ async function onSlotDrop(e) {
   const postId = e.dataTransfer.getData('text/plain');
   if (!postId) return;
 
-  const slotKey = e.currentTarget.dataset.slotKey;
   const wi      = parseInt(e.currentTarget.dataset.windowIndex, 10);
   const date    = e.currentTarget.dataset.date; // YYYY-MM-DD
   const win     = state.config?.timeWindows?.[wi];
   if (!win || !date) return showToast('Invalid slot', true);
 
   const post = state.queue.posts.find(p => p.id === postId);
-  if (post && post.slotKey === slotKey) return; // dropped on its own slot
 
-  // Pick a random time within the window. For today, ensure it's at least 1 minute in the future.
-  const dayDate = new Date(date + 'T00:00:00');
-  const [sh, sm] = win.start.split(':').map(Number);
-  const [eh, em] = win.end.split(':').map(Number);
-  const start = new Date(dayDate); start.setHours(sh, sm, 0, 0);
-  const end   = new Date(dayDate); end.setHours(eh, em, 0, 0);
-  const earliest = new Date(Math.max(start.getTime(), Date.now() + 60_000));
-  if (earliest >= end) return showToast('That window has already passed', true);
-  const random = new Date(earliest.getTime() + Math.random() * (end.getTime() - earliest.getTime()));
+  const random = randomTimeInWindow(date, win);
+  if (!random) return showToast('That window has already passed', true);
+
+  // Always derive slotKey from the chosen moment's Brisbane date.
+  const slotKey = slotKeyFromMoment(random.toISOString(), wi);
+  if (post && post.slotKey === slotKey) return; // dropped on its own slot
 
   try {
     await api('PUT', '/posts/' + postId, {
