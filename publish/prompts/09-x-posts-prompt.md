@@ -27,18 +27,25 @@ Read the metadata and YouTube result, then draft social posts for the episode la
 
 ## How to think about the 3 variants
 - **Post 1 — Viral launch:** broadest hook, drives clicks. Goes live at launch.
-  - On X: **attach the video file directly** via `media.video` — X actively suppresses posts that link out to YouTube and rewards reach for native video. Never put `https://youtu.be/...` in `content.x.text`.
+  - On X: prefer **native video** via `media.video` — X actively suppresses posts that link out to YouTube and rewards reach for native video. But X Basic/Free caps video at **512 MB / 140 seconds**, so this only works if a clip is supplied (see below).
   - On every other network (Bluesky, LinkedIn, Facebook, etc.): include the YouTube URL — those platforms don't penalise external links the way X does.
 - **Post 2 — Community / quote-tweet angle:** reply value, technical or community-specific take. Posted later (scheduler will pick a later slot automatically). Usually no media on X for this one — it's a follow-up text post.
 - **Post 3 — Takeaways:** condensed key insights. Single post per network, not a multi-tweet thread (the scheduler does not support threads — collapse the thread into one strong post per network).
 
-## Choosing the video file for `media.video`
+## Choosing the video file for X (`media.video`)
 Look in `publish/upload/` and pick, in this priority order:
-1. `upload/<episode>-clip.mp4` (a short trailer/teaser, ideal for X — under ~140s)
-2. `upload/<episode>-trailer.mp4`
-3. `upload/<episode>.mp4` (full episode — only fall back to this if no clip exists; full episodes often exceed X's upload limits)
+1. `upload/<episode>-clip.mp4` (a short trailer/teaser, ideal for X — under 140 s and 512 MB)
+2. `upload/<episode>-trailer.mp4` (same size/duration constraints)
+3. **No fallback to the full episode mp4.** X Basic/Free will reject anything over 512 MB / 140 s; the upload script (`upload-x-media.js`) hard-blocks oversize files before posting. Do NOT set `media.video` to the full episode file.
 
-If only the full episode exists and it's clearly too long for X (>2 min, or >512 MB), prefer leaving `media.video` null on X and posting an image/quoted-post instead, and flag this in `x-posts.md` so Peter can record a short clip before launch.
+### If no clip exists
+1. Leave `media.video` set to `null` on the X post.
+2. **Add the YouTube URL into `content.x.text`** — this is the only case where the X post may include an external URL. Reach will be lower than native video, but it's better than no link at all.
+3. **Add a warning at the top of `output/x-posts.md`** that says clearly:
+
+   > ⚠️ No clip found in `upload/`. X launch post is using the YouTube link as a fallback (lower reach). To improve next time, add `<episode>-clip.mp4` (≤140 s, ≤512 MB) to `upload/` before running step 9.
+
+This warning must be present every time the fallback is used — Peter relies on it as the reminder to record a clip in future episodes.
 
 ## Output 1: `output/x-posts.md`
 Same markdown structure as before, kept for Peter's review. Show the X text, character count, and (after `09-queue-x-posts.js` runs) the slot the scheduler assigned.
@@ -51,9 +58,22 @@ A JSON array. Each element matches the scheduler POST `/api/posts` body. Example
   {
     "title": "Episode launch — Tweag on Cardano core dev",
     "networks": ["x", "bluesky", "linkedin", "facebook"],
+    "//": "Clip available — attach to X, no URL in X text.",
     "media": { "image": null, "video": "/home/aiagent/.openclaw/workspace/publish/upload/EPISODE-clip.mp4" },
     "content": {
       "x":        { "text": "Hook + curiosity gap. NO youtube URL — the clip in media.video does the heavy lifting." },
+      "bluesky":  { "text": "... https://youtu.be/VIDEO_ID" },
+      "linkedin": { "text": "...", "link": "https://youtu.be/VIDEO_ID" },
+      "facebook": { "message": "...", "link": "https://youtu.be/VIDEO_ID" }
+    }
+  },
+  {
+    "title": "Episode launch — fallback when no clip exists",
+    "networks": ["x", "bluesky", "linkedin", "facebook"],
+    "//": "No clip in upload/ — video.media is null on X, and the YouTube URL is in content.x.text. x-posts.md must open with a warning.",
+    "media": { "image": null, "video": null },
+    "content": {
+      "x":        { "text": "Hook + curiosity gap.\n\nhttps://youtu.be/VIDEO_ID" },
       "bluesky":  { "text": "... https://youtu.be/VIDEO_ID" },
       "linkedin": { "text": "...", "link": "https://youtu.be/VIDEO_ID" },
       "facebook": { "message": "...", "link": "https://youtu.be/VIDEO_ID" }
@@ -79,9 +99,9 @@ node scripts/09-queue-x-posts.js
 This writes `output/x-posts-queue-result.json` with the assigned slot for each post. Update `x-posts.md` with those slot timestamps so Peter can see when each will go out.
 
 ## Quality Checks
-- [ ] X post text contains no external URLs
-- [ ] **Launch post: `media.video` is set to a clip in `upload/`, NOT a YouTube URL in the X text**
-- [ ] If only the full episode mp4 is available and it's >2 min or >512 MB, X media is null and `x-posts.md` flags that a clip is needed
+- [ ] **Launch post X media.video is either a real clip ≤140 s / ≤512 MB, or null (never the full episode mp4)**
+- [ ] If `media.video` is null on X, the YouTube URL IS in `content.x.text` AND `x-posts.md` opens with the ⚠️ "no clip found" warning block
+- [ ] If `media.video` is set on X, `content.x.text` contains NO external URL
 - [ ] No post exceeds its network's character limit
 - [ ] Post 1 includes the YouTube URL on every non-X network
 - [ ] No price predictions / financial advice
