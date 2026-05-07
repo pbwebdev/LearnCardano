@@ -59,14 +59,14 @@ function findMatch(contentDir, keywords) {
   return best;
 }
 
-async function generateImage(prompt, size, outFile) {
+async function generateImage(prompt, size, outFile, model) {
   const apiKey = loadOpenAIKey();
   const fetchFn = globalThis.fetch || (await import('node-fetch')).default;
 
   const res = await fetchFn('https://api.openai.com/v1/images/generations', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({ model: 'gpt-image-1', prompt, size, n: 1 }),
+    body: JSON.stringify({ model, prompt, size, n: 1 }),
   });
   const text = await res.text();
   if (!res.ok) throw new Error(`OpenAI Images error ${res.status}: ${text.slice(0, 500)}`);
@@ -81,6 +81,12 @@ async function generateImage(prompt, size, outFile) {
 async function main() {
   const prompt = arg('--prompt');
   const size = arg('--size') || '1536x1024';
+  // Model is configurable so you can swap to gpt-image-2 / etc. when released
+  // without editing the script. Precedence: --model > IMAGE_MODEL env > default.
+  // Default to gpt-image-2 (current SOTA). Requires org verification at
+  // https://platform.openai.com/settings/organization/general — until verified
+  // requests return 403. Override with --model gpt-image-1 or IMAGE_MODEL env.
+  const model = arg('--model') || process.env.IMAGE_MODEL || 'gpt-image-2';
   let outArg = arg('--out');
   const keywords = arg('--keywords');
   const slug = arg('--slug');
@@ -104,11 +110,11 @@ async function main() {
   }
   const out = path.resolve(outArg);
   if (has('--dry-run')) {
-    console.log(JSON.stringify({ ok: true, dryRun: true, prompt, size, out }, null, 2));
+    console.log(JSON.stringify({ ok: true, dryRun: true, prompt, size, model, out }, null, 2));
     return;
   }
-  const file = await generateImage(prompt, size, out);
-  console.log(JSON.stringify({ ok: true, file, source: 'generated' }, null, 2));
+  const file = await generateImage(prompt, size, out, model);
+  console.log(JSON.stringify({ ok: true, file, model, source: 'generated' }, null, 2));
 }
 
 main().catch(err => { console.error('❌', err.message || String(err)); process.exit(1); });
