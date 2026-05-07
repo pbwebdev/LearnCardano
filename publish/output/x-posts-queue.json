@@ -1,0 +1,51 @@
+[
+  {
+    "title": "Episode launch - Tweag on Peras and Cardano core infrastructure",
+    "networks": ["x", "bluesky", "linkedin", "facebook"],
+    "media": { "image": null, "video": null },
+    "content": {
+      "x": {
+        "text": "Cardano finality could go from ~12 minutes to 2-5 minutes if Peras lands.\n\nThe part most people miss is the cost. A faster network usually means heavier nodes, and smaller SPOs are already running tight.\n\nTweag's answer is history expiry and archival nodes.\n\nWorth a yes vote, or are the cost guarantees too light?"
+      },
+      "bluesky": {
+        "text": "Cardano finality from ~12 min to 2-5 min if Peras lands. The catch is node cost. A heavier chain hits smaller SPOs first. Tweag's answer is history expiry and archival nodes. https://youtu.be/4zkKsJ5a9LU"
+      },
+      "linkedin": {
+        "text": "Cardano finality could drop from roughly 12 minutes to 2 to 5 minutes if Peras ships.\n\nThe interesting part of this Tweag interview was not the protocol details. It was the cost question. A faster, busier network usually puts more pressure on the operators running it, and smaller SPOs are already operating with tight margins.\n\nTweag's answer is history expiry and archival nodes. The idea is that ordinary node operators stop having to carry every historical block forever, while archival infrastructure preserves the full history separately. That changes the storage curve for the people who keep Cardano decentralised.\n\nWhether the cost guarantees are strong enough to justify a yes vote on the proposal is a separate question. Worth listening to the trade-offs.",
+        "link": "https://youtu.be/4zkKsJ5a9LU"
+      },
+      "facebook": {
+        "message": "Cardano finality could drop from roughly 12 minutes to 2 to 5 minutes if Peras ships.\n\nThe interesting part of this Tweag interview wasn't the protocol details. It was the cost question. A faster, busier network usually puts more pressure on the operators running it, and smaller SPOs are already on tight margins.\n\nTweag's answer is history expiry and archival nodes. The idea is that ordinary node operators stop having to carry every historical block forever, while archival infrastructure preserves the full history separately.\n\nWhether the cost guarantees are strong enough to justify a yes vote on the proposal is a separate question.",
+        "link": "https://youtu.be/4zkKsJ5a9LU"
+      }
+    }
+  },
+  {
+    "title": "Community angle - Why Peras needs more than protocol code",
+    "networks": ["x", "bluesky"],
+    "content": {
+      "x": {
+        "text": "SPO costs are the thing I kept coming back to in this Tweag conversation.\n\nPeras gets us faster finality, but a busier chain usually means heavier nodes. Smaller pools end up wearing it unless history expiry and operator tooling ship alongside the protocol.\n\nWonder how many DReps are actually weighing that before they vote."
+      },
+      "bluesky": {
+        "text": "SPO costs are what I kept circling back to in this Tweag conversation. Peras gets us faster finality, but a busier chain usually means heavier nodes. Smaller pools wear it unless history expiry and operator tooling ship alongside."
+      }
+    }
+  },
+  {
+    "title": "Takeaways - Two years in a single ask",
+    "networks": ["x", "bluesky", "linkedin"],
+    "content": {
+      "x": {
+        "text": "Tweag wants 2 years to ship Peras V1 to mainnet plus V2 research, history expiry, archival nodes, and operator tooling.\n\nTreating it as one coordinated pipeline instead of a stack of separate grants is probably the right call.\n\nBut two years in a single ask is a lot. Worth voting yes, or should this be broken down further?"
+      },
+      "bluesky": {
+        "text": "Tweag is asking for 2 years to ship Peras V1 to mainnet plus V2 research, history expiry, archival nodes, and operator tooling. One coordinated pipeline is probably the right call. But two years in a single ask is a big bet."
+      },
+      "linkedin": {
+        "text": "Tweag's proposal asks for two years to deliver Peras V1 to mainnet, run V2 research in parallel, ship history expiry and archival nodes, and build out operator tooling alongside the protocol work.\n\nThe argument for treating it as one coordinated pipeline rather than five separate grants is sound. Cardano scaling work has historically suffered from gaps between protocol code and the surrounding tooling, and bundling forces the dependencies to be planned together.\n\nThe harder question is whether two years is the right ask in a single proposal, or whether milestone-gating across smaller asks would give DReps better control of the trade-off.",
+        "link": "https://youtu.be/4zkKsJ5a9LU"
+      }
+    }
+  }
+]

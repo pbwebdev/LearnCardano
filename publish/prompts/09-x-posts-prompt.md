@@ -6,10 +6,11 @@ Read the metadata and YouTube result, then draft social posts for the episode la
 1. `output/x-posts.md` — human-readable preview (markdown, same structure as before).
 2. `output/x-posts-queue.json` — machine-readable array of scheduler post objects, fed into `node scripts/09-queue-x-posts.js`, which POSTs each entry to the scheduler API. The scheduler assigns the next available `slotKey` + `scheduledFor` automatically.
 
-**Context files to read:**
-- `output/metadata.json` — Description, takeaways, keywords, excerpt
-- `output/youtube-result.json` — `videoId` for the YouTube URL
-- `output/title-and-thumbnail-suggestions.md` — for tone/angle alignment
+**Context files to read (in this order):**
+1. `rules/astroboysoup-x-writing-rules-concise.md` — **Pete's voice rules. Read first. The X content of every post in this step must comply with these rules.** They're stricter than the generic compliance block below: no YouTube/external links in X posts, no banned openers ("Big takeaways", "I…", "Just…", "So…"), no bullet lists in standalone posts, no setup-payoff "not X, but Y" framing, every post ends with an opinion or specific question, hooks must use a number / named event / direct claim. When in doubt, defer to the rules file, not this prompt.
+2. `output/metadata.json` — Description, takeaways, keywords, excerpt
+3. `output/youtube-result.json` — `videoId` for the YouTube URL (used in non-X networks only)
+4. `output/title-and-thumbnail-suggestions.md` — for tone/angle alignment
 
 ## Compliance Rules
 - No price predictions or financial advice
@@ -40,10 +41,12 @@ Look in `publish/upload/` and pick, in this priority order:
 
 ### If no clip exists
 1. Leave `media.video` set to `null` on the X post.
-2. **Add the YouTube URL into `content.x.text`** — this is the only case where the X post may include an external URL. Reach will be lower than native video, but it's better than no link at all.
-3. **Add a warning at the top of `output/x-posts.md`** that says clearly:
+2. **Do NOT put the YouTube URL into `content.x.text`.** Pete's writing rules (section 9) ban YouTube/external links in X posts outright. The post must stand on its own — strong hook, real claim, opinion or question close.
+3. **Add a warning at the top of `output/x-posts.md`** that tells Peter to drop the YouTube link as a manual reply within the first 30-60 minutes after launch:
 
-   > ⚠️ No clip found in `upload/`. X launch post is using the YouTube link as a fallback (lower reach). To improve next time, add `<episode>-clip.mp4` (≤140 s, ≤512 MB) to `upload/` before running step 9.
+   > ⚠️ No clip found in `upload/`. The X launch post is text-only — no YouTube link in the X post itself, per `rules/astroboysoup-x-writing-rules-concise.md` section 9. Drop the link as a manual reply within 30-60 minutes after launch. To improve next launch, add `<episode>-clip.mp4` (≤140 s, ≤512 MB) to `upload/` before running step 9.
+
+4. In each X post entry of `output/x-posts.md`, include a `**Manual reply (after launch):**` line listing the YouTube URL so Peter has the reply text ready.
 
 This warning must be present every time the fallback is used — Peter relies on it as the reminder to record a clip in future episodes.
 
@@ -70,13 +73,13 @@ A JSON array. Each element matches the scheduler POST `/api/posts` body. Example
   {
     "title": "Episode launch — fallback when no clip exists",
     "networks": ["x", "bluesky", "linkedin", "facebook"],
-    "//": "No clip in upload/ — video.media is null on X, and the YouTube URL is in content.x.text. x-posts.md must open with a warning.",
+    "//": "No clip in upload/ — media.video is null AND no YouTube URL in content.x.text. The X post stands on its own. x-posts.md must open with the ⚠️ warning and list the YouTube URL as a Manual reply.",
     "media": { "image": null, "video": null },
     "content": {
-      "x":        { "text": "Hook + curiosity gap.\n\nhttps://youtu.be/VIDEO_ID" },
-      "bluesky":  { "text": "... https://youtu.be/VIDEO_ID" },
-      "linkedin": { "text": "...", "link": "https://youtu.be/VIDEO_ID" },
-      "facebook": { "message": "...", "link": "https://youtu.be/VIDEO_ID" }
+      "x":        { "text": "Specific number / named claim hook.\n\nReal insight that pays off the hook.\n\nOpinion or question close — no link, no link, no link." },
+      "bluesky":  { "text": "Tighter version. https://youtu.be/VIDEO_ID" },
+      "linkedin": { "text": "Long-form professional version.", "link": "https://youtu.be/VIDEO_ID" },
+      "facebook": { "message": "Friendly version.", "link": "https://youtu.be/VIDEO_ID" }
     }
   },
   { "title": "Community angle — ...", "networks": ["x", "bluesky"], "content": { "x": { "text": "..." }, "bluesky": { "text": "..." } } },
@@ -99,10 +102,15 @@ node scripts/09-queue-x-posts.js
 This writes `output/x-posts-queue-result.json` with the assigned slot for each post. Update `x-posts.md` with those slot timestamps so Peter can see when each will go out.
 
 ## Quality Checks
-- [ ] **Launch post X media.video is either a real clip ≤140 s / ≤512 MB, or null (never the full episode mp4)**
-- [ ] If `media.video` is null on X, the YouTube URL IS in `content.x.text` AND `x-posts.md` opens with the ⚠️ "no clip found" warning block
-- [ ] If `media.video` is set on X, `content.x.text` contains NO external URL
+- [ ] **No X post contains an external URL** (rules section 9 — applies whether or not a clip is attached)
+- [ ] Every X post hook uses a number, named event, direct claim, tension, or contradiction (rules section 3)
+- [ ] No X post starts with banned openers: I, We, Here's, Just, So, Big update, Excited to share, Governance season is here (rules section 3)
+- [ ] Every X post ends with an opinion, specific question, or low-friction action — not "what do you think?" or "hope this helps" (rules section 5)
+- [ ] No bullet lists in standalone X posts (rules section 4) — comma lists in body prose are fine
+- [ ] No setup-payoff or "not X, but Y" symmetric framing (rules section 12.2 — also smells AI in posts)
+- [ ] Launch post `media.video` is either a real clip ≤140 s / ≤512 MB, or null (never the full episode mp4)
+- [ ] If no clip, `x-posts.md` opens with the ⚠️ "no clip found, link in reply" warning, and each X post has a `**Manual reply (after launch):**` line carrying the YouTube URL
 - [ ] No post exceeds its network's character limit
-- [ ] Post 1 includes the YouTube URL on every non-X network
+- [ ] Post 1 includes the YouTube URL on every non-X network (Bluesky, LinkedIn, Facebook)
 - [ ] No price predictions / financial advice
 - [ ] Each variant tells a distinct angle (launch / community / takeaways)
