@@ -240,6 +240,7 @@ body {
 .post-card[draggable=true] { cursor: grab; }
 .post-card[draggable=true]:active { cursor: grabbing; }
 .post-card.dragging { opacity: 0.4; }
+.post-card.drag-over { border-color: var(--accent); background: #1a1d00; }
 
 .slot-bar {
   position: absolute;
@@ -1153,7 +1154,7 @@ function renderPostCard(post, opts = {}) {
   const retryBtn  = showRetry ? `<button class="btn-sm success" onclick="retryPost('${post.id}')">Retry</button>` : '';
 
   return `
-    <div class="post-card" id="card-${post.id}"${draggable ? ` draggable="true" ondragstart="onPostDragStart(event,'${post.id}')" ondragend="onPostDragEnd(event)"` : ''}>
+    <div class="post-card" id="card-${post.id}" data-post-id="${post.id}"${draggable ? ` draggable="true" ondragstart="onPostDragStart(event,'${post.id}')" ondragend="onPostDragEnd(event)" ondragover="onCardDragOver(event)" ondragleave="onCardDragLeave(event)" ondrop="onCardDrop(event,'${post.id}')"` : ''}>
       ${bar}
       <div class="card-header">
         <div class="card-meta">
@@ -1283,6 +1284,75 @@ function onSlotDragOver(e) {
 
 function onSlotDragLeave(e) {
   e.currentTarget.classList.remove('drag-over');
+}
+
+function randomTimeInWindow(date, win) {
+  const dayDate = new Date(date + 'T00:00:00');
+  const [sh, sm] = win.start.split(':').map(Number);
+  const [eh, em] = win.end.split(':').map(Number);
+  const start = new Date(dayDate); start.setHours(sh, sm, 0, 0);
+  const end   = new Date(dayDate); end.setHours(eh, em, 0, 0);
+  const earliest = new Date(Math.max(start.getTime(), Date.now() + 60_000));
+  if (earliest >= end) return null;
+  return new Date(earliest.getTime() + Math.random() * (end.getTime() - earliest.getTime()));
+}
+
+function slotKeyToParts(key) {
+  // YYYY-MM-DD-{wi}
+  const m = String(key).match(/^(\d{4}-\d{2}-\d{2})-(\d+)$/);
+  return m ? { date: m[1], wi: parseInt(m[2], 10) } : null;
+}
+
+function onCardDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  e.currentTarget.classList.add('drag-over');
+}
+
+function onCardDragLeave(e) {
+  e.currentTarget.classList.remove('drag-over');
+}
+
+async function onCardDrop(e, targetId) {
+  e.preventDefault();
+  e.stopPropagation();
+  e.currentTarget.classList.remove('drag-over');
+  const sourceId = e.dataTransfer.getData('text/plain');
+  if (!sourceId || sourceId === targetId) return;
+
+  const source = state.queue.posts.find(p => p.id === sourceId);
+  const target = state.queue.posts.find(p => p.id === targetId);
+  if (!source || !target) return showToast('Post not found', true);
+
+  const sParts = slotKeyToParts(source.slotKey);
+  const tParts = slotKeyToParts(target.slotKey);
+  if (!sParts || !tParts) return showToast('Cannot swap: missing slot info', true);
+
+  const wins = state.config?.timeWindows || [];
+  const sWin = wins[sParts.wi];
+  const tWin = wins[tParts.wi];
+  if (!sWin || !tWin) return showToast('Cannot swap: window not found', true);
+
+  const sNewTime = randomTimeInWindow(tParts.date, tWin);
+  const tNewTime = randomTimeInWindow(sParts.date, sWin);
+  if (!sNewTime || !tNewTime) return showToast('Target window has already passed', true);
+
+  // Three-step swap to avoid the server's slot-conflict guard:
+  // 1. Park source on a unique temp slotKey
+  // 2. Move target into source's old slot
+  // 3. Move source into target's old slot
+  const tempKey = `swap-tmp-${sourceId}-${Date.now()}`;
+
+  try {
+    await api('PUT', '/posts/' + sourceId, { slotKey: tempKey, scheduledFor: source.scheduledFor });
+    await api('PUT', '/posts/' + targetId, { slotKey: source.slotKey, scheduledFor: tNewTime.toISOString() });
+    await api('PUT', '/posts/' + sourceId, { slotKey: target.slotKey, scheduledFor: sNewTime.toISOString() });
+    showToast(`Swapped ${sWin.label} ↔ ${tWin.label}`);
+    loadData();
+  } catch (err) {
+    showToast('Swap failed: ' + err.message, true);
+    loadData();
+  }
 }
 
 async function onSlotDrop(e) {
