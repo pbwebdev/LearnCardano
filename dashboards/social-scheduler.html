@@ -1130,8 +1130,8 @@ function cardPreview(post) {
 }
 
 function renderPostCard(post, opts = {}) {
-  const { showStatus = false, showRetry = false, draggable = false } = opts;
-  const wi = parseSlotWindowIndex(post.slotKey);
+  const { showStatus = false, showRetry = false, draggable = false, windowIndex } = opts;
+  const wi = windowIndex !== undefined ? windowIndex : parseSlotWindowIndex(post.slotKey);
   const bar = wi != null
     ? `<span class="slot-bar" style="background:${slotColor(wi)}"></span>`
     : '';
@@ -1191,7 +1191,10 @@ function renderUpcoming() {
   const todayStr = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Australia/Brisbane', year: 'numeric', month: '2-digit', day: '2-digit'
   }).format(now);
-  const days = (state.slots || []).filter(d => d.date >= todayStr);
+  // Don't filter days here — a post's slotKey day can differ from Brisbane
+  // today by one when server runs in a different timezone. Past empty slots
+  // are filtered per-slot below; days with nothing visible are dropped.
+  const days = (state.slots || []);
 
   if (!days.length && !posts.length) {
     return `<div class="empty-state"><h3>No upcoming posts</h3><p>Click <strong>+ Add Post</strong> to schedule one.</p></div>`;
@@ -1200,37 +1203,55 @@ function renderUpcoming() {
   // Track posts already rendered via slots so we can show orphans (no slotKey or slotKey out of range)
   const renderedIds = new Set();
 
+  // Match posts to slots by Brisbane time of scheduledFor falling in a window.
+  // This tolerates stale slotKeys (e.g. after the time-window order changed).
+  const nowMs = Date.now();
+  const slotEndMs = s => s.window ? new Date(`${s.date}T${s.window.end}:00+10:00`).getTime() : 0;
+  const slotStartMs = s => s.window ? new Date(`${s.date}T${s.window.start}:00+10:00`).getTime() : 0;
+
+  const postBySlotKey = {};
+  for (const p of posts) {
+    if (!p.scheduledFor) continue;
+    const t = new Date(p.scheduledFor).getTime();
+    for (const day of days) {
+      let matched = false;
+      for (const s of day.slots) {
+        if (!s.window) continue;
+        if (t >= slotStartMs(s) && t < slotEndMs(s)) {
+          if (!postBySlotKey[s.key]) postBySlotKey[s.key] = p;
+          matched = true;
+          break;
+        }
+      }
+      if (matched) break;
+    }
+  }
+
   const html = days.map(day => {
     // Sort slots chronologically by start time
     const sorted = day.slots.slice().sort((a, b) =>
       (a.window?.start || '').localeCompare(b.window?.start || '')
     );
 
-    // Compute past status using Brisbane time (server may be UTC)
-    const nowMs = Date.now();
-    const slotPast = s => {
-      if (!s.window) return false;
-      const end = new Date(`${s.date}T${s.window.end}:00+10:00`);
-      return end.getTime() <= nowMs;
-    };
-
-    // Hide past empty slots for older days; for today, show them as "passed"
+    // Show occupied slots always; show empty slots only if not past Brisbane time
     const visible = sorted.filter(s => {
-      if (s.occupied) return true;
-      return s.date >= todayStr && !(s.date < todayStr);
+      if (postBySlotKey[s.key]) return true;
+      if (!s.window) return false;
+      return slotEndMs(s) > nowMs;
     });
     if (!visible.length) return '';
 
     const heading = fmtDateAEST(day.date + 'T12:00:00+10:00');
 
     const rows = visible.map(s => {
-      if (s.occupied && s.post && postById[s.post.id]) {
-        renderedIds.add(s.post.id);
-        return renderPostCard(postById[s.post.id], { draggable: true });
+      const post = postBySlotKey[s.key];
+      if (post) {
+        renderedIds.add(post.id);
+        return renderPostCard(post, { draggable: true, windowIndex: s.windowIndex });
       }
       const winLabel = s.window?.label || '';
       const winRange = s.window ? `${s.window.start}–${s.window.end}` : '';
-      const past = slotPast(s);
+      const past = slotEndMs(s) <= nowMs;
       if (past) {
         return `<div class="slot-empty past">
             <span class="slot-bar" style="background:${slotColor(s.windowIndex)}"></span>
