@@ -1010,6 +1010,20 @@ textarea.form-input { resize: vertical; font-family: var(--mono); font-size: 12p
             </div>
           </div>
 
+          <div class="schedule-option" id="sched-custom-option" onclick="selectScheduleMode('custom')">
+            <input type="radio" name="schedule-mode" value="custom">
+            <div style="width:100%">
+              <div class="schedule-option-label">Custom time</div>
+              <div class="schedule-option-desc">Pick an exact date and time outside the configured slots</div>
+              <div class="manual-slot-picker hidden" id="custom-time-picker" style="grid-template-columns:1fr">
+                <div>
+                  <label class="form-label" style="margin-top:10px">Date &amp; time (Brisbane)</label>
+                  <input type="datetime-local" class="form-input" id="field-custom-datetime">
+                </div>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
 
@@ -1246,11 +1260,13 @@ function renderUpcoming() {
       (a.window?.start || '').localeCompare(b.window?.start || '')
     );
 
-    // Show occupied slots always; show empty slots only if not past Brisbane time
+    // Show occupied slots always; show empty slots only if their window
+    // hasn't started yet — once we're past the start time the window can
+    // no longer accept a new post (a post takes a few minutes to send).
     const visible = sorted.filter(s => {
       if (postBySlotKey[s.key]) return true;
       if (!s.window) return false;
-      return slotEndMs(s) > nowMs;
+      return slotStartMs(s) > nowMs;
     });
     if (!visible.length) return '';
 
@@ -1264,7 +1280,7 @@ function renderUpcoming() {
       }
       const winLabel = s.window?.label || '';
       const winRange = s.window ? `${s.window.start}–${s.window.end}` : '';
-      const past = slotEndMs(s) <= nowMs;
+      const past = slotStartMs(s) <= nowMs;
       if (past) {
         return `<div class="slot-empty past">
             <span class="slot-bar" style="background:${slotColor(s.windowIndex)}"></span>
@@ -1676,7 +1692,20 @@ function openModal(post = null) {
   setMediaField('field-image', '');
   setMediaField('field-video', '');
   NETWORKS.forEach(n => { document.getElementById('net-' + n).checked = false; });
-  selectScheduleMode('auto');
+  // If editing a post with a custom slotKey, pre-select Custom mode and
+  // pre-fill the datetime input from its scheduledFor.
+  if (post && typeof post.slotKey === 'string' && post.slotKey.startsWith('custom-') && post.scheduledFor) {
+    const t = new Date(post.scheduledFor);
+    const yyyy = t.getFullYear();
+    const mm = String(t.getMonth() + 1).padStart(2, '0');
+    const dd = String(t.getDate()).padStart(2, '0');
+    const hh = String(t.getHours()).padStart(2, '0');
+    const mi = String(t.getMinutes()).padStart(2, '0');
+    document.getElementById('field-custom-datetime').value = `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+    selectScheduleMode('custom');
+  } else {
+    selectScheduleMode('auto');
+  }
 
   if (post) {
     document.getElementById('field-title').value = post.title || '';
@@ -1707,18 +1736,33 @@ function selectScheduleMode(mode) {
   state.schedMode = mode;
   document.getElementById('sched-auto-option').classList.toggle('selected',   mode === 'auto');
   document.getElementById('sched-manual-option').classList.toggle('selected', mode === 'manual');
+  document.getElementById('sched-custom-option').classList.toggle('selected', mode === 'custom');
   document.querySelector('#sched-auto-option input').checked   = mode === 'auto';
   document.querySelector('#sched-manual-option input').checked = mode === 'manual';
+  document.querySelector('#sched-custom-option input').checked = mode === 'custom';
 
-  const picker = document.getElementById('manual-slot-picker');
+  const manualPicker = document.getElementById('manual-slot-picker');
+  const customPicker = document.getElementById('custom-time-picker');
+
+  manualPicker.classList.toggle('hidden', mode !== 'manual');
+  customPicker.classList.toggle('hidden', mode !== 'custom');
+
   if (mode === 'manual') {
-    picker.classList.remove('hidden');
-    // Default date to tomorrow
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     document.getElementById('field-slot-date').value = tomorrow.toISOString().slice(0, 10);
-  } else {
-    picker.classList.add('hidden');
+  } else if (mode === 'custom') {
+    const el = document.getElementById('field-custom-datetime');
+    if (el && !el.value) {
+      // Default to one hour from now in Brisbane local format
+      const t = new Date(Date.now() + 60 * 60_000);
+      const yyyy = t.getFullYear();
+      const mm = String(t.getMonth() + 1).padStart(2, '0');
+      const dd = String(t.getDate()).padStart(2, '0');
+      const hh = String(t.getHours()).padStart(2, '0');
+      const mi = String(t.getMinutes()).padStart(2, '0');
+      el.value = `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+    }
   }
 }
 
@@ -2052,7 +2096,17 @@ async function submitPost() {
 
   let scheduledFor, slotKey;
 
-  if (state.schedMode === 'manual') {
+  if (state.schedMode === 'custom') {
+    const raw = document.getElementById('field-custom-datetime').value;
+    if (!raw) return showToast('Pick a date and time', true);
+    const dt = new Date(raw);
+    if (isNaN(dt.getTime())) return showToast('Invalid date/time', true);
+    if (dt.getTime() <= Date.now()) return showToast('Custom time must be in the future', true);
+    scheduledFor = dt.toISOString();
+    // Use a synthetic slotKey so the server doesn't reassign via nextAvailableSlot.
+    // The "custom-" prefix makes it easy to identify and keeps it out of the slot grid.
+    slotKey = `custom-${dt.getTime()}-${Math.floor(Math.random() * 1e6)}`;
+  } else if (state.schedMode === 'manual') {
     const date  = document.getElementById('field-slot-date').value;
     const winI  = parseInt(document.getElementById('field-slot-window').value, 10);
     const wins  = state.config?.timeWindows || [];
