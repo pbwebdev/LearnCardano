@@ -171,6 +171,9 @@ Write `output/blog-post.html`:
 - Disclaimer at the very end
 - Use only: `<h2>`, `<h3>`, `<p>`, `<a>`, `<ul>`, `<li>`, `<strong>`, `<em>`, `<blockquote>`, `<div>`
 
+### Step 8 prerequisite: WordPress mu-plugin
+The publish script writes `youtube_video` and `text_transcript` via the WP REST API. For those writes to land, the site must have `publish/wordpress/podcast-acf-rest.php` installed at `wp-content/mu-plugins/podcast-acf-rest.php` on learncardano.io. mu-plugins auto-load — there is no activation step. Without this file the post body still publishes but the two ACF fields stay empty (the script does not error).
+
 ### Step 8: Publish to WordPress [SCRIPT]
 ```bash
 node scripts/08-publish-wordpress.js
